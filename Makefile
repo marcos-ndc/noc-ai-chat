@@ -102,6 +102,16 @@ branch-feature: ## Cria branch de feature (NAME=nome-da-feature)
 	git checkout -b feature/$(NAME)
 	@echo "$(GREEN)✅ Branch feature/$(NAME) criada$(RESET)"
 
+fix-docker: ## Corrige erro 'error getting credentials' do Docker
+	bash scripts/fix-docker-credentials.sh
+
+pull-images: ## Pré-baixa todas as imagens Docker necessárias
+	docker pull python:3.12-slim
+	docker pull node:20-alpine
+	docker pull nginx:1.27-alpine
+	docker pull redis:7-alpine
+	@echo "$(GREEN)✅ Todas as imagens baixadas$(RESET)"
+
 branch-fix: ## Cria branch de fix (NAME=nome-do-fix)
 	git checkout main && git pull origin main
 	git checkout -b fix/$(NAME)
