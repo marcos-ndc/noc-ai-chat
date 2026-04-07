@@ -1,0 +1,49 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    # Anthropic
+    anthropic_api_key: str = ""
+    claude_model: str = "claude-sonnet-4-20250514"
+
+    # Auth
+    jwt_secret: str = "dev-secret-change-in-production"
+    jwt_expiry_hours: int = 8
+    jwt_algorithm: str = "HS256"
+
+    # Redis
+    redis_url: str = "redis://localhost:6379"
+    session_ttl_seconds: int = 86400   # 24h
+    max_history_turns: int = 50
+
+    # Zabbix
+    zabbix_url: str = ""
+    zabbix_user: str = ""
+    zabbix_password: str = ""
+
+    # Datadog
+    datadog_api_key: str = ""
+    datadog_app_key: str = ""
+    datadog_site: str = "datadoghq.com"
+
+    # Grafana
+    grafana_url: str = ""
+    grafana_token: str = ""
+
+    # ThousandEyes
+    thousandeyes_token: str = ""
+
+    # MCP server URLs (internal docker network)
+    mcp_zabbix_url: str = "http://mcp-zabbix:8001"
+    mcp_datadog_url: str = "http://mcp-datadog:8002"
+    mcp_grafana_url: str = "http://mcp-grafana:8003"
+    mcp_thousandeyes_url: str = "http://mcp-thousandeyes:8004"
+
+    # App
+    log_level: str = "INFO"
+    cors_origins: list[str] = ["http://localhost:3000"]
+
+
+settings = Settings()
