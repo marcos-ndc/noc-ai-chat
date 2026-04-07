@@ -6,3 +6,9 @@ dist/
 .DS_Store
 coverage/
 .vite/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
