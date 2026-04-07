@@ -68,6 +68,59 @@ MCP_TOOLS: list[dict] = [
         },
     },
     {
+        "name": "zabbix_get_active_problems",
+        "description": "Zabbix 7.x: busca problemas ativos via problem.get (mais preciso que trigger.get). Retorna eventos com status, severidade, duração e se está reconhecido.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "severity": {"type": "string", "enum": ["information", "warning", "average", "high", "disaster"], "description": "Severidade mínima"},
+                "group": {"type": "string", "description": "Nome do grupo de hosts"},
+                "host": {"type": "string", "description": "Hostname específico"},
+                "limit": {"type": "integer", "default": 30},
+            },
+        },
+    },
+    {
+        "name": "zabbix_get_item_latest",
+        "description": "Busca o último valor de um item de monitoramento no Zabbix (CPU, memória, disco, etc.).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "hostname": {"type": "string"},
+                "item_key": {"type": "string", "description": "Chave do item. Ex: system.cpu.util, vm.memory.size[available], vfs.fs.size[/,pfree]"},
+            },
+            "required": ["hostname", "item_key"],
+        },
+    },
+    {
+        "name": "zabbix_get_host_groups",
+        "description": "Lista todos os grupos de hosts cadastrados no Zabbix.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "datadog_get_logs",
+        "description": "Busca logs recentes no Datadog com filtro por query.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Query Datadog. Ex: 'service:api status:error', 'host:web-01 @http.status_code:500'", "default": "status:error"},
+                "from_minutes_ago": {"type": "integer", "default": 30},
+                "limit": {"type": "integer", "default": 20},
+            },
+        },
+    },
+    {
+        "name": "datadog_get_hosts",
+        "description": "Lista hosts monitorados no Datadog com status e apps.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "filter": {"type": "string", "description": "Filtro. Ex: 'env:prod', 'role:database'"},
+                "count": {"type": "integer", "default": 30},
+            },
+        },
+    },
+    {
         "name": "datadog_get_metrics",
         "description": "Busca métricas de um host ou serviço no Datadog.",
         "input_schema": {
