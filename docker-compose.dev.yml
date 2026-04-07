@@ -3,30 +3,35 @@ version: '3.9'
 # ─── Desenvolvimento local com hot-reload ─────────────────────────────────────
 # Uso: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 # Ou:  make dev
+#
+# Portas padrão (configuráveis no .env):
+#   FRONTEND_PORT=3000
+#   BACKEND_PORT=8000
+#   REDIS_PORT=6379
 
 services:
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
-      # pull_policy: if_not_present evita falha de credenciais Docker Hub
     pull_policy: if_not_present
     ports:
-      - "3000:3000"       # Vite dev server roda na 3000, não nginx na 80
+      - "${FRONTEND_PORT:-3000}:3000"
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
       - ./frontend/index.html:/app/index.html
     environment:
-      - VITE_BACKEND_URL=http://localhost:8000
+      - VITE_BACKEND_URL=http://localhost:${BACKEND_PORT:-8000}
     command: npm run dev -- --host 0.0.0.0 --port 3000
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
+    pull_policy: if_not_present
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend/app:/app/app
       - ./backend/tests:/app/tests
@@ -39,6 +44,7 @@ services:
   mcp-zabbix:
     build:
       context: ./mcp-servers/zabbix
+    pull_policy: if_not_present
     volumes:
       - ./mcp-servers/zabbix/server.py:/app/server.py
     env_file: .env
@@ -47,6 +53,7 @@ services:
   mcp-datadog:
     build:
       context: ./mcp-servers/datadog
+    pull_policy: if_not_present
     volumes:
       - ./mcp-servers/datadog/server.py:/app/server.py
     env_file: .env
@@ -55,6 +62,7 @@ services:
   mcp-grafana:
     build:
       context: ./mcp-servers/grafana
+    pull_policy: if_not_present
     volumes:
       - ./mcp-servers/grafana/server.py:/app/server.py
     env_file: .env
@@ -63,6 +71,7 @@ services:
   mcp-thousandeyes:
     build:
       context: ./mcp-servers/thousandeyes
+    pull_policy: if_not_present
     volumes:
       - ./mcp-servers/thousandeyes/server.py:/app/server.py
     env_file: .env
@@ -70,8 +79,9 @@ services:
 
   redis:
     image: redis:7-alpine
+    pull_policy: if_not_present
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_dev_data:/data
     healthcheck:
