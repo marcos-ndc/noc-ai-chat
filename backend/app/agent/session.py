@@ -19,6 +19,10 @@ class SessionManager:
             )
         return self._redis
 
+    @redis.setter
+    def redis(self, value: aioredis.Redis) -> None:
+        self._redis = value
+
     def _key(self, session_id: str) -> str:
         return f"session:{session_id}"
 
