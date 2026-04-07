@@ -1,0 +1,81 @@
+version: '3.9'
+
+# ─── Desenvolvimento local com hot-reload ─────────────────────────────────────
+# Uso: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_BACKEND_URL=http://localhost:8000
+    command: npm run dev -- --host 0.0.0.0
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/tests:/app/tests
+    ports:
+      - "8000:8000"
+    env_file: .env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  mcp-zabbix:
+    build:
+      context: ./mcp-servers/zabbix
+    volumes:
+      - ./mcp-servers/zabbix/server.py:/app/server.py
+    env_file: .env
+    command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+
+  mcp-datadog:
+    build:
+      context: ./mcp-servers/datadog
+    volumes:
+      - ./mcp-servers/datadog/server.py:/app/server.py
+    env_file: .env
+    command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+
+  mcp-grafana:
+    build:
+      context: ./mcp-servers/grafana
+    volumes:
+      - ./mcp-servers/grafana/server.py:/app/server.py
+    env_file: .env
+    command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+
+  mcp-thousandeyes:
+    build:
+      context: ./mcp-servers/thousandeyes
+    volumes:
+      - ./mcp-servers/thousandeyes/server.py:/app/server.py
+    env_file: .env
+    command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis_dev_data:
