@@ -28,6 +28,11 @@ dev: ## Sobe stack completo em modo desenvolvimento (hot-reload)
 	@echo "$(CYAN)→ Iniciando stack de desenvolvimento...$(RESET)"
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
+rebuild: ## Rebuild completo sem cache (use quando mudar requirements ou Dockerfiles)
+	@echo "$(CYAN)→ Rebuild completo sem cache...$(RESET)"
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml build --no-cache
+	@echo "$(GREEN)✅ Build completo — rode 'make dev' para subir$(RESET)"
+
 dev-bg: ## Sobe stack em background
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 	@echo "$(GREEN)✅ Stack rodando em background$(RESET)"

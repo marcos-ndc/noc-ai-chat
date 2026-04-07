@@ -12,7 +12,9 @@ RUN pip install --no-cache-dir \
     --trusted-host pypi.org \
     --trusted-host files.pythonhosted.org \
     --trusted-host pypi.python.org \
-    -r requirements.txt --target /app/deps
+    -r requirements.txt --target /app/deps && \
+    # Remove passlib se instalado por cache antigo (incompatível com Python 3.12)
+    pip uninstall -y passlib 2>/dev/null || true
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM python:3.12-slim AS runner
