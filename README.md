@@ -41,7 +41,7 @@ Integra **Zabbix**, **Datadog**, **Grafana** e **ThousandEyes** via MCP Tools.
 ### Pré-requisitos
 - Docker + Docker Compose
 - Node.js 20+ (para desenvolvimento)
-- Python 3.12+ (para desenvolvimento)
+- Python 3.8+ (para desenvolvimento)
 
 ### 1. Clone e configure
 ```bash
