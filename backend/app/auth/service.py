@@ -1,45 +1,21 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 
 from app.models import AuthResponse, UserOut, UserProfile
 from app.settings import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# ─── Seed users (replace with DB in v2) ──────────────────────────────────────
-_USERS: list[dict] = [
-    {
-        "id": "user-1",
-        "name": "Admin NOC",
-        "email": "admin@noc.local",
-        "hashed_password": pwd_context.hash("admin123"),
-        "profile": UserProfile.N2,
-    },
-    {
-        "id": "user-2",
-        "name": "Analista N1",
-        "email": "n1@noc.local",
-        "hashed_password": pwd_context.hash("noc2024"),
-        "profile": UserProfile.N1,
-    },
-    {
-        "id": "user-3",
-        "name": "Engenheiro Sênior",
-        "email": "eng@noc.local",
-        "hashed_password": pwd_context.hash("eng2024"),
-        "profile": UserProfile.engineer,
-    },
-    {
-        "id": "user-4",
-        "name": "Gestor NOC",
-        "email": "gestor@noc.local",
-        "hashed_password": pwd_context.hash("mgr2024"),
-        "profile": UserProfile.manager,
-    },
-]
+def _hash_password(password: str) -> str:
+    """Hash a password using bcrypt."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def _verify_password(plain: str, hashed: str) -> bool:
+    """Verify a password against a bcrypt hash."""
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
 def _initials(name: str) -> str:
@@ -49,12 +25,45 @@ def _initials(name: str) -> str:
     return name[:2].upper()
 
 
+# ─── Seed users (replace with DB in v2) ──────────────────────────────────────
+_USERS: list[dict] = [
+    {
+        "id": "user-1",
+        "name": "Admin NOC",
+        "email": "admin@noc.local",
+        "hashed_password": _hash_password("admin123"),
+        "profile": UserProfile.N2,
+    },
+    {
+        "id": "user-2",
+        "name": "Analista N1",
+        "email": "n1@noc.local",
+        "hashed_password": _hash_password("noc2024"),
+        "profile": UserProfile.N1,
+    },
+    {
+        "id": "user-3",
+        "name": "Engenheiro Sênior",
+        "email": "eng@noc.local",
+        "hashed_password": _hash_password("eng2024"),
+        "profile": UserProfile.engineer,
+    },
+    {
+        "id": "user-4",
+        "name": "Gestor NOC",
+        "email": "gestor@noc.local",
+        "hashed_password": _hash_password("mgr2024"),
+        "profile": UserProfile.manager,
+    },
+]
+
+
 class AuthService:
     def login(self, email: str, password: str) -> Optional[AuthResponse]:
         user = next((u for u in _USERS if u["email"] == email), None)
         if not user:
             return None
-        if not pwd_context.verify(password, user["hashed_password"]):
+        if not _verify_password(password, user["hashed_password"]):
             return None
 
         payload = {
