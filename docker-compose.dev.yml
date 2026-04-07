@@ -9,6 +9,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
+      # pull_policy: if_not_present evita falha de credenciais Docker Hub
+    pull_policy: if_not_present
     ports:
       - "3000:3000"       # Vite dev server roda na 3000, não nginx na 80
     volumes:
