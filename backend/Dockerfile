@@ -2,18 +2,24 @@
 FROM python:3.12-slim AS builder
 
 WORKDIR /app
+
+# Configura pip para ignorar SSL em ambientes com proxy corporativo
+ENV PIP_TRUSTED_HOST="pypi.org files.pythonhosted.org pypi.python.org"
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt --target /app/deps
+RUN pip install --no-cache-dir \
+    --trusted-host pypi.org \
+    --trusted-host files.pythonhosted.org \
+    --trusted-host pypi.python.org \
+    -r requirements.txt --target /app/deps
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM python:3.12-slim AS runner
 
 WORKDIR /app
 
-# Copy installed packages
 COPY --from=builder /app/deps /usr/local/lib/python3.12/site-packages
-
-# Copy app
 COPY app/ ./app/
 
 EXPOSE 8000

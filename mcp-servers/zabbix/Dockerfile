@@ -1,8 +1,21 @@
 FROM python:3.12-slim
+
 WORKDIR /app
+
+ENV PIP_TRUSTED_HOST="pypi.org files.pythonhosted.org pypi.python.org"
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir \
+    --trusted-host pypi.org \
+    --trusted-host files.pythonhosted.org \
+    --trusted-host pypi.python.org \
+    -r requirements.txt
+
 COPY server.py .
+
 EXPOSE 8001
-HEALTHCHECK --interval=30s --timeout=3s CMD python -c "import httpx; httpx.get('http://localhost:8001/health')"
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"
+
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8001"]
