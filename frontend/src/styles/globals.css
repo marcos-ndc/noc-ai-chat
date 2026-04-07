@@ -1,0 +1,166 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600&family=Syne:wght@700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --noc-bg:       #0a0f1e;
+  --noc-surface:  #111827;
+  --noc-border:   #1e2d4a;
+  --noc-accent:   #00d4ff;
+  --noc-accent2:  #7c3aed;
+  --noc-user:     #1d4ed8;
+  --noc-agent:    #1a2744;
+  --noc-success:  #10b981;
+  --noc-warning:  #f59e0b;
+  --noc-danger:   #ef4444;
+  --noc-muted:    #6b7280;
+  --noc-text:     #e2e8f0;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  height: 100%;
+  background-color: var(--noc-bg);
+  color: var(--noc-text);
+  font-family: 'Space Grotesk', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--noc-bg); }
+::-webkit-scrollbar-thumb { background: var(--noc-border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--noc-accent); }
+
+/* Scan line overlay */
+.scanlines::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 212, 255, 0.015) 2px,
+    rgba(0, 212, 255, 0.015) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Grid background */
+.noc-grid {
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Glow effects */
+.glow-accent { box-shadow: 0 0 20px rgba(0, 212, 255, 0.3); }
+.glow-danger  { box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
+.text-glow    { text-shadow: 0 0 20px rgba(0, 212, 255, 0.5); }
+
+/* Typing cursor */
+.typing-cursor::after {
+  content: '▋';
+  animation: blink 1s step-end infinite;
+  color: var(--noc-accent);
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* Tool indicator pulse */
+@keyframes tool-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.6; transform: scale(0.95); }
+}
+
+.tool-active { animation: tool-pulse 1.5s ease-in-out infinite; }
+
+/* Message appear */
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.msg-appear { animation: msg-in 0.2s ease-out forwards; }
+
+/* Markdown in chat */
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+  font-family: 'Syne', sans-serif;
+  color: var(--noc-accent);
+  margin: 0.75rem 0 0.4rem;
+}
+.markdown-body h1 { font-size: 1.1rem; }
+.markdown-body h2 { font-size: 1rem; }
+.markdown-body h3 { font-size: 0.9rem; }
+
+.markdown-body p    { margin-bottom: 0.5rem; line-height: 1.6; }
+.markdown-body ul,
+.markdown-body ol   { padding-left: 1.25rem; margin-bottom: 0.5rem; }
+.markdown-body li   { margin-bottom: 0.25rem; }
+
+.markdown-body code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+  color: var(--noc-accent);
+}
+
+.markdown-body pre {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--noc-border);
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+.markdown-body pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--noc-text);
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+
+.markdown-body th {
+  background: rgba(0, 212, 255, 0.1);
+  color: var(--noc-accent);
+  padding: 0.4rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--noc-border);
+}
+
+.markdown-body td {
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid rgba(30, 45, 74, 0.5);
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--noc-accent);
+  padding-left: 0.75rem;
+  color: var(--noc-muted);
+  margin: 0.5rem 0;
+  font-style: italic;
+}
+
+.markdown-body strong { color: #fff; font-weight: 600; }
+.markdown-body em     { color: var(--noc-warning); }
+.markdown-body a      { color: var(--noc-accent); text-decoration: underline; }

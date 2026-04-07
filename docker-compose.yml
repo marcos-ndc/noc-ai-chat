@@ -1,0 +1,79 @@
+version: '3.9'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_BACKEND_URL=${BACKEND_URL:-http://localhost:8000}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+      mcp-zabbix:
+        condition: service_started
+      mcp-datadog:
+        condition: service_started
+      mcp-grafana:
+        condition: service_started
+      mcp-thousandeyes:
+        condition: service_started
+
+  mcp-zabbix:
+    build:
+      context: ./mcp-servers/zabbix
+      dockerfile: Dockerfile
+    env_file: .env
+    restart: unless-stopped
+
+  mcp-datadog:
+    build:
+      context: ./mcp-servers/datadog
+      dockerfile: Dockerfile
+    env_file: .env
+    restart: unless-stopped
+
+  mcp-grafana:
+    build:
+      context: ./mcp-servers/grafana
+      dockerfile: Dockerfile
+    env_file: .env
+    restart: unless-stopped
+
+  mcp-thousandeyes:
+    build:
+      context: ./mcp-servers/thousandeyes
+      dockerfile: Dockerfile
+    env_file: .env
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  redis_data:
