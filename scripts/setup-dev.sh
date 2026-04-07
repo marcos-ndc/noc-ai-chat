@@ -27,7 +27,14 @@ info "Verificando pré-requisitos..."
 
 command -v docker  >/dev/null 2>&1 || error "Docker não encontrado. Instale em https://docs.docker.com/get-docker/"
 command -v node    >/dev/null 2>&1 || error "Node.js não encontrado. Instale em https://nodejs.org/ (v20+)"
-command -v python3 >/dev/null 2>&1 || error "Python 3 não encontrado. Instale em https://python.org/ (3.12+)"
+command -v python3 >/dev/null 2>&1 || error "Python 3 não encontrado. Instale em https://python.org/ (3.8+)"
+
+# Verifica versão mínima do Python (3.8+)
+PY_MAJOR=$(python3 -c "import sys; print(sys.version_info.major)")
+PY_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
+if [ "$PY_MAJOR" -lt 3 ] || ([ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 8 ]); then
+    error "Python 3.8+ é necessário. Versão encontrada: $PY_MAJOR.$PY_MINOR\n  Instale em: https://python.org/"
+fi
 command -v git     >/dev/null 2>&1 || error "Git não encontrado."
 
 DOCKER_V=$(docker --version | grep -oE '[0-9]+\.[0-9]+')
