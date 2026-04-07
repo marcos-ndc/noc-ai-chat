@@ -23,6 +23,8 @@ setup: ## Configura ambiente de desenvolvimento (cria .env, instala deps)
 
 # ─── Desenvolvimento ──────────────────────────────────────────────────────────
 dev: ## Sobe stack completo em modo desenvolvimento (hot-reload)
+	@echo "$(CYAN)→ Parando containers anteriores...$(RESET)"
+	-docker compose -f docker-compose.yml -f docker-compose.dev.yml down --remove-orphans 2>/dev/null
 	@echo "$(CYAN)→ Verificando portas disponíveis...$(RESET)"
 	@bash scripts/check-ports.sh || (echo "$(YELLOW)  Dica: mude FRONTEND_PORT ou BACKEND_PORT no .env$(RESET)" && exit 1)
 	@echo "$(CYAN)→ Iniciando stack de desenvolvimento...$(RESET)"
