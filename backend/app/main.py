@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,11 +19,21 @@ structlog.configure(
 
 log = structlog.get_logger()
 
+
+# ─── Lifespan ────────────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    log.info("noc_ai_chat.started", model=settings.claude_model)
+    yield
+    log.info("noc_ai_chat.stopped")
+
+
 # ─── App ─────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="NOC AI Chat API",
     version="1.0.0",
     description="Backend do agente de IA especializado em operações NOC",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -42,14 +53,3 @@ app.include_router(health_router)
 @app.websocket("/ws/chat")
 async def ws_chat(websocket: WebSocket):
     await handle_chat_websocket(websocket)
-
-
-# ─── Startup / Shutdown ──────────────────────────────────────────────────────
-@app.on_event("startup")
-async def startup():
-    log.info("noc_ai_chat.started", model=settings.claude_model)
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    log.info("noc_ai_chat.stopped")
