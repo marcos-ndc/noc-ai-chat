@@ -23,9 +23,19 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
+    host: '0.0.0.0',         // necessário para rodar dentro do Docker
+    strictPort: true,         // falha se porta ocupada em vez de tentar outra
     proxy: {
-      '/api': { target: 'http://localhost:8000', changeOrigin: true },
-      '/ws': { target: 'ws://localhost:8000', ws: true }
+      '/api': {
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/ws': {
+        target: (process.env.VITE_BACKEND_URL || 'http://localhost:8000')
+          .replace(/^http/, 'ws'),
+        ws: true,
+        changeOrigin: true,
+      }
     }
   }
 })

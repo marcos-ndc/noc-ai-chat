@@ -5,10 +5,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_BACKEND_URL=${BACKEND_PUBLIC_URL:-http://localhost:8000}
     ports:
       - "3000:80"
-    environment:
-      - VITE_BACKEND_URL=http://backend:8000
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost/health"]
       interval: 30s

@@ -1,32 +1,33 @@
 version: '3.9'
 
 # ─── Desenvolvimento local com hot-reload ─────────────────────────────────────
-# Uso: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Uso: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# Ou:  make dev
 
 services:
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"       # Vite dev server roda na 3000, não nginx na 80
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
       - ./frontend/index.html:/app/index.html
-    ports:
-      - "3000:3000"
     environment:
       - VITE_BACKEND_URL=http://localhost:8000
-    command: npm run dev -- --host 0.0.0.0
+    command: npm run dev -- --host 0.0.0.0 --port 3000
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
     volumes:
       - ./backend/app:/app/app
       - ./backend/tests:/app/tests
-    ports:
-      - "8000:8000"
     env_file: .env
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
