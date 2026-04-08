@@ -24,13 +24,17 @@ log = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Validate critical configuration on startup
-    if not settings.anthropic_api_key:
+    key = settings.anthropic_api_key
+    if not key:
         log.warning(
             "noc_ai_chat.config_warning",
             message="ANTHROPIC_API_KEY não configurada — o agente não conseguirá responder. "
-                    "Adicione a chave no .env e reinicie.",
+                    "Adicione sua chave no arquivo .env na raiz do projeto e reinicie com 'make dev'.",
         )
-    log.info("noc_ai_chat.started", model=settings.claude_model)
+    else:
+        # Log masked key so we can confirm it's being loaded
+        masked = key[:8] + "..." + key[-4:]
+        log.info("noc_ai_chat.started", model=settings.claude_model, api_key_loaded=masked)
     yield
     log.info("noc_ai_chat.stopped")
 
@@ -65,3 +69,19 @@ app.include_router(health_router)
 @app.websocket("/ws/chat")
 async def ws_chat(websocket: WebSocket):
     await handle_chat_websocket(websocket)
+
+
+# ─── Debug (dev only) ────────────────────────────────────────────────────────
+@app.get("/debug/config")
+async def debug_config():
+    """Shows masked config values — helps diagnose env var issues."""
+    import os
+    key = settings.anthropic_api_key
+    return {
+        "anthropic_api_key": (key[:8] + "...[masked]") if key else "NOT SET",
+        "anthropic_key_length": len(key),
+        "claude_model": settings.claude_model,
+        "cors_allow_all": settings.cors_allow_all,
+        "redis_url": settings.redis_url,
+        "env_ANTHROPIC_API_KEY_present": bool(os.environ.get("ANTHROPIC_API_KEY")),
+    }
