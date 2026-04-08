@@ -38,6 +38,9 @@ services:
     env_file: .env
     environment:
       - CORS_ALLOW_ALL=true
+      # Garante que a chave Anthropic chega ao container mesmo em ambientes
+      # onde env_file não é lido (ex: Docker Desktop em alguns sistemas)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       redis:
