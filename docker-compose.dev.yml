@@ -1,13 +1,13 @@
-version: '3.9'
-
 # ─── Desenvolvimento local com hot-reload ─────────────────────────────────────
-# Uso: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 # Ou:  make dev
 #
-# Portas padrão (configuráveis no .env):
-#   FRONTEND_PORT=3000
-#   BACKEND_PORT=8000
-#   REDIS_PORT=6379
+# Portas configuráveis no .env:
+#   FRONTEND_PORT=3000  BACKEND_PORT=8000  REDIS_PORT=6379
+#
+# Proxy SSL corporativo — adicione no .env se receber "Connection error":
+#   ANTHROPIC_SSL_VERIFY=false
+#   SSL_VERIFY=false
 
 services:
   frontend:
@@ -38,14 +38,8 @@ services:
     env_file: .env
     environment:
       - CORS_ALLOW_ALL=true
-      # Garante que a chave Anthropic chega ao container mesmo em ambientes
-      # onde env_file não é lido (ex: Docker Desktop em alguns sistemas)
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      # Proxy corporativo: descomente a linha abaixo se receber SSL errors
-      # para api.anthropic.com (ex: "Connection error", "SSL certificate verify failed")
-      #- ANTHROPIC_SSL_VERIFY=false
-      # Ou injete o certificado raiz da empresa:
-      #- REQUESTS_CA_BUNDLE=/etc/ssl/certs/corp-ca.pem
+      - ANTHROPIC_SSL_VERIFY=${ANTHROPIC_SSL_VERIFY:-true}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       redis:
@@ -59,8 +53,7 @@ services:
       - ./mcp-servers/zabbix/server.py:/app/server.py
     env_file: .env
     environment:
-      # Descomente para ambientes com proxy/firewall corporativo
-      #- SSL_VERIFY=false
+      - SSL_VERIFY=${SSL_VERIFY:-true}
     command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   mcp-datadog:
@@ -71,8 +64,8 @@ services:
       - ./mcp-servers/datadog/server.py:/app/server.py
     env_file: .env
     environment:
-      # Descomente para ambientes com proxy/firewall corporativo
-      #- SSL_VERIFY=false
+      - SSL_VERIFY=${SSL_VERIFY:-true}
+      - DATADOG_SSL_VERIFY=${DATADOG_SSL_VERIFY:-true}
     command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   mcp-grafana:
@@ -83,8 +76,7 @@ services:
       - ./mcp-servers/grafana/server.py:/app/server.py
     env_file: .env
     environment:
-      # Descomente para ambientes com proxy/firewall corporativo
-      #- SSL_VERIFY=false
+      - SSL_VERIFY=${SSL_VERIFY:-true}
     command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   mcp-thousandeyes:
@@ -95,8 +87,7 @@ services:
       - ./mcp-servers/thousandeyes/server.py:/app/server.py
     env_file: .env
     environment:
-      # Descomente para ambientes com proxy/firewall corporativo
-      #- SSL_VERIFY=false
+      - SSL_VERIFY=${SSL_VERIFY:-true}
     command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   redis:
