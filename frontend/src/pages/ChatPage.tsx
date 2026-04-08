@@ -5,10 +5,10 @@ import { ChatInput } from '../components/Chat/ChatInput'
 import { StatusIndicator } from '../components/StatusIndicator/StatusIndicator'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useVoiceOutput } from '../hooks/useVoiceOutput'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth, useAuthStore } from '../hooks/useAuth'
 import type { Message, ToolName, WSEvent } from '../types'
 
-const BACKEND_WS = (import.meta.env.VITE_BACKEND_URL ?? 'ws://localhost:8000')
+const BACKEND_WS_BASE = (import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000')
   .replace(/^http/, 'ws') + '/ws/chat'
 
 function generateId(): string {
@@ -34,6 +34,7 @@ Como posso ajudar você agora?`,
 
 export function ChatPage() {
   const { user, logout } = useAuth()
+  const token = useAuthStore(s => s.token)
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
   const [activeTools, setActiveTools] = useState<ToolName[]>([])
   const [isAgentTyping, setIsAgentTyping] = useState(false)
@@ -43,6 +44,9 @@ export function ChatPage() {
   const currentAgentMsgId = useRef<string | null>(null)
 
   const voiceOutput = useVoiceOutput()
+
+  // WS URL com token JWT no query param (requerido pelo backend)
+  const wsUrl = token ? `${BACKEND_WS_BASE}?token=${token}` : null
 
   // Handle incoming WS events
   const handleWSMessage = useCallback((event: WSEvent) => {
@@ -125,9 +129,9 @@ export function ChatPage() {
     }
   }, [voiceOutputEnabled, voiceOutput, messages])
 
-  const { isConnected, send } = useWebSocket(BACKEND_WS, {
+  const { isConnected, send } = useWebSocket(wsUrl ?? '', {
     onMessage: handleWSMessage,
-    autoReconnect: true,
+    autoReconnect: !!wsUrl,
   })
 
   // Auto-scroll to bottom
