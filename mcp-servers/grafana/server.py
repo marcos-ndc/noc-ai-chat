@@ -5,7 +5,8 @@ Expõe tools para o agente consultar alertas e regras no Grafana.
 import os
 
 # Proxy corporativo: SSL_VERIFY=false para ambientes com inspeção SSL
-_SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() != "false"
+# Default false for corporate environments with SSL inspection
+_SSL_VERIFY = os.getenv("SSL_VERIFY", "false").lower() != "false"
 from typing import Optional
 import httpx
 from fastapi import FastAPI

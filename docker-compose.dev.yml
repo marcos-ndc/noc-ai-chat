@@ -53,7 +53,7 @@ services:
       - ./mcp-servers/zabbix/server.py:/app/server.py
     env_file: .env
     environment:
-      - SSL_VERIFY=${SSL_VERIFY:-true}
+      - SSL_VERIFY=${SSL_VERIFY:-false}
     command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   mcp-datadog:
@@ -64,8 +64,8 @@ services:
       - ./mcp-servers/datadog/server.py:/app/server.py
     env_file: .env
     environment:
-      - SSL_VERIFY=${SSL_VERIFY:-true}
-      - DATADOG_SSL_VERIFY=${DATADOG_SSL_VERIFY:-true}
+      - SSL_VERIFY=${SSL_VERIFY:-false}
+      - DATADOG_SSL_VERIFY=${DATADOG_SSL_VERIFY:-false}
     command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   mcp-grafana:
@@ -76,7 +76,7 @@ services:
       - ./mcp-servers/grafana/server.py:/app/server.py
     env_file: .env
     environment:
-      - SSL_VERIFY=${SSL_VERIFY:-true}
+      - SSL_VERIFY=${SSL_VERIFY:-false}
     command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   mcp-thousandeyes:
@@ -87,7 +87,7 @@ services:
       - ./mcp-servers/thousandeyes/server.py:/app/server.py
     env_file: .env
     environment:
-      - SSL_VERIFY=${SSL_VERIFY:-true}
+      - SSL_VERIFY=${SSL_VERIFY:-false}
     command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   redis:
