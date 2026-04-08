@@ -61,7 +61,7 @@ class SessionManager:
     def build_claude_messages(self, session: SessionData) -> list[dict]:
         """Convert session messages to Claude API format."""
         return [
-            {"role": msg.role.value if msg.role != "agent" else "assistant",
+            {"role": "user" if msg.role == MessageRole.user else "assistant",
              "content": msg.content}
             for msg in session.messages
         ]

@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 # ─── Enums ───────────────────────────────────────────────────────────────────
@@ -62,14 +62,14 @@ class TokenPayload(BaseModel):
 class ChatMessage(BaseModel):
     role: MessageRole
     content: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class SessionData(BaseModel):
     session_id: str
     user_id: str
     user_profile: UserProfile
     messages: list[ChatMessage] = []
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ─── WebSocket Events ────────────────────────────────────────────────────────
@@ -87,8 +87,7 @@ class WSOutbound(BaseModel):
     error: Optional[str] = None
 
     def to_json(self) -> str:
-        import json
-        return json.dumps(self.model_dump(exclude_none=True))
+        return self.model_dump_json(exclude_none=True)
 
 
 # ─── Health ──────────────────────────────────────────────────────────────────
@@ -101,4 +100,4 @@ class ServiceStatus(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     services: list[ServiceStatus]
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

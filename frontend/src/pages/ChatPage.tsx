@@ -137,7 +137,6 @@ export function ChatPage() {
   }, [messages, isAgentTyping])
 
   const handleSend = useCallback((content: string) => {
-    // Add user message
     const userMsg: Message = {
       id: generateId(),
       role: 'user',
@@ -145,14 +144,13 @@ export function ChatPage() {
       status: 'done',
       timestamp: new Date(),
     }
-    setMessages(prev => [...prev, userMsg])
 
-    // Prepare agent message slot
+    // CR-4: set agentId BEFORE send() to avoid race with first token
     const agentId = generateId()
     currentAgentMsgId.current = agentId
     setIsAgentTyping(true)
+    setMessages(prev => [...prev, userMsg])
 
-    // Send via WS
     send({ type: 'user_message', content, sessionId })
   }, [send, sessionId])
 

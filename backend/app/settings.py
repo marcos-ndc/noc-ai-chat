@@ -36,10 +36,11 @@ class Settings(BaseSettings):
     thousandeyes_token: str = ""
 
     # MCP server URLs (internal docker network)
+    # Containers comunicam pela porta INTERNA (8001), não pela porta mapeada no host
     mcp_zabbix_url: str = "http://mcp-zabbix:8001"
-    mcp_datadog_url: str = "http://mcp-datadog:8002"
-    mcp_grafana_url: str = "http://mcp-grafana:8003"
-    mcp_thousandeyes_url: str = "http://mcp-thousandeyes:8004"
+    mcp_datadog_url: str = "http://mcp-datadog:8001"
+    mcp_grafana_url: str = "http://mcp-grafana:8001"
+    mcp_thousandeyes_url: str = "http://mcp-thousandeyes:8001"
 
     # App
     log_level: str = "INFO"
