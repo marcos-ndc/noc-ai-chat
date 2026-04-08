@@ -80,12 +80,12 @@ class DatadogClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def validate(self) -> bool:
+    async def validate(self) -> tuple[bool, str]:
         try:
             await self.get("/api/v1/validate")
-            return True
-        except Exception:
-            return False
+            return True, ""
+        except Exception as e:
+            return False, str(e)
 
     async def close(self):
         await self._client.aclose()
@@ -101,17 +101,28 @@ _dd = DatadogClient()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not MOCK_MODE:
-        if await _dd.validate():
-            log.info(f"datadog.startup: autenticado — site={DD_SITE}")
+        ok, err = await _dd.validate()
+        if ok:
+            log.info(f"datadog.startup: autenticado — site={DD_SITE}, url={DD_BASE}")
         else:
+            # Diagnose the type of failure
+            if "SSL" in err or "certificate" in err.lower() or "CERTIFICATE" in err:
+                cause = "Certificado SSL corporativo rejeitado. Adicione SSL_VERIFY=false no .env"
+            elif "401" in err or "403" in err or "Forbidden" in err or "Unauthorized" in err:
+                cause = "Credenciais inválidas. Verifique DATADOG_API_KEY e DATADOG_APP_KEY no .env"
+            elif "connect" in err.lower() or "Connection" in err:
+                cause = f"Proxy/firewall bloqueando {DD_BASE}. Adicione SSL_VERIFY=false no .env"
+            elif "Name or service not known" in err or "DNS" in err:
+                cause = f"DNS falhou para {DD_BASE}. Verifique conectividade de rede"
+            else:
+                cause = f"Erro desconhecido: {err}"
             log.warning(
-                "datadog.startup: não foi possível conectar à API Datadog. "
-                "Possíveis causas: credenciais inválidas, proxy/firewall bloqueando "
-                f"api.{DD_SITE}, ou SSL corporativo. "
-                "Operando em modo DEGRADADO — retornará mock data até conectividade ser restabelecida."
+                f"datadog.startup: DEGRADADO — {cause}. "
+                f"URL tentada: {DD_BASE}/api/v1/validate. "
+                "Retornando mock data até conectividade ser restabelecida."
             )
     else:
-        log.info("datadog.startup: modo MOCK ativo (DATADOG_API_KEY não configurado)")
+        log.info(f"datadog.startup: modo MOCK ativo — DATADOG_API_KEY não configurado")
     yield
     await _dd.close()
 
