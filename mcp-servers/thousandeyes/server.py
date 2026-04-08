@@ -3,6 +3,9 @@ MCP Server — ThousandEyes
 Expõe tools para o agente consultar testes e alertas de rede.
 """
 import os
+
+# Proxy corporativo: SSL_VERIFY=false para ambientes com inspeção SSL
+_SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() != "false"
 from typing import Optional
 import httpx
 from fastapi import FastAPI
@@ -16,7 +19,7 @@ _HEADERS  = {"Authorization": f"Bearer {TE_TOKEN}", "Content-Type": "application
 
 
 async def _te_get(path: str, params: Optional[dict] = None) -> dict:
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=10.0, verify=_SSL_VERIFY) as client:
         resp = await client.get(f"{TE_BASE}{path}", headers=_HEADERS, params=params)
         resp.raise_for_status()
         return resp.json()

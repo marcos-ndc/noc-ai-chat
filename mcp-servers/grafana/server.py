@@ -3,6 +3,9 @@ MCP Server — Grafana
 Expõe tools para o agente consultar alertas e regras no Grafana.
 """
 import os
+
+# Proxy corporativo: SSL_VERIFY=false para ambientes com inspeção SSL
+_SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() != "false"
 from typing import Optional
 import httpx
 from fastapi import FastAPI
@@ -16,7 +19,7 @@ _HEADERS = {"Authorization": f"Bearer {GRAFANA_TOKEN}", "Content-Type": "applica
 
 
 async def _grafana_get(path: str, params: Optional[dict] = None) -> dict | list:
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=10.0, verify=_SSL_VERIFY) as client:
         resp = await client.get(f"{GRAFANA_URL}{path}", headers=_HEADERS, params=params)
         resp.raise_for_status()
         return resp.json()
