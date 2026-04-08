@@ -24,6 +24,8 @@ DD_API_KEY  = os.getenv("DATADOG_API_KEY", "")
 DD_APP_KEY  = os.getenv("DATADOG_APP_KEY", "")
 DD_SITE     = os.getenv("DATADOG_SITE", "datadoghq.com")
 DD_TIMEOUT  = int(os.getenv("DATADOG_TIMEOUT", "10"))
+# Proxy corporativo: SSL_VERIFY=false para ambientes com inspeção SSL
+DD_SSL_VERIFY = os.getenv("DATADOG_SSL_VERIFY", os.getenv("SSL_VERIFY", "true")).lower() != "false"
 
 MOCK_MODE = not bool(DD_API_KEY)
 DD_BASE   = f"https://api.{DD_SITE}"
@@ -38,6 +40,7 @@ class DatadogClient:
     def __init__(self):
         self._client = httpx.AsyncClient(
             timeout=DD_TIMEOUT,
+            verify=DD_SSL_VERIFY,
             headers={
                 "DD-API-KEY": DD_API_KEY,
                 "DD-APPLICATION-KEY": DD_APP_KEY,
@@ -101,7 +104,12 @@ async def lifespan(app: FastAPI):
         if await _dd.validate():
             log.info(f"datadog.startup: autenticado — site={DD_SITE}")
         else:
-            log.warning("datadog.startup: credenciais inválidas ou sem conectividade")
+            log.warning(
+                "datadog.startup: não foi possível conectar à API Datadog. "
+                "Possíveis causas: credenciais inválidas, proxy/firewall bloqueando "
+                f"api.{DD_SITE}, ou SSL corporativo. "
+                "Operando em modo DEGRADADO — retornará mock data até conectividade ser restabelecida."
+            )
     else:
         log.info("datadog.startup: modo MOCK ativo (DATADOG_API_KEY não configurado)")
     yield
