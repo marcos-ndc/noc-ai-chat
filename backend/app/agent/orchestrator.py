@@ -3,18 +3,17 @@ import uuid
 from collections.abc import AsyncGenerator
 from typing import Optional
 
-import anthropic
+from anthropic import AsyncAnthropic
 
 from app.agent.prompt import get_system_prompt
 from app.agent.session import session_manager
 from app.models import (
     ChatMessage, MessageRole, SessionData,
-    ToolName, UserOut, UserProfile,
-    WSEventType, WSOutbound,
+    ToolName, WSEventType, WSOutbound,
 )
 from app.settings import settings
 
-# ─── MCP Tool definitions per tool ───────────────────────────────────────────
+# ─── MCP Tool definitions ─────────────────────────────────────────────────────
 
 MCP_TOOLS: list[dict] = [
     # Zabbix
@@ -24,9 +23,22 @@ MCP_TOOLS: list[dict] = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "severity": {"type": "string", "enum": ["disaster", "high", "average", "warning", "info"], "description": "Severidade mínima"},
+                "severity": {"type": "string", "enum": ["disaster", "high", "average", "warning", "info"]},
                 "group": {"type": "string", "description": "Nome do grupo de hosts (opcional)"},
                 "limit": {"type": "integer", "default": 20},
+            },
+        },
+    },
+    {
+        "name": "zabbix_get_active_problems",
+        "description": "Zabbix 7.x: busca problemas ativos via problem.get. Retorna eventos com status, severidade, duração.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "severity": {"type": "string", "enum": ["information", "warning", "average", "high", "disaster"]},
+                "group": {"type": "string"},
+                "host": {"type": "string"},
+                "limit": {"type": "integer", "default": 30},
             },
         },
     },
@@ -36,7 +48,7 @@ MCP_TOOLS: list[dict] = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "hostname": {"type": "string", "description": "Nome ou IP do host"},
+                "hostname": {"type": "string"},
             },
             "required": ["hostname"],
         },
@@ -54,40 +66,14 @@ MCP_TOOLS: list[dict] = [
             "required": ["hostname"],
         },
     },
-    # Datadog
-    {
-        "name": "datadog_get_active_monitors",
-        "description": "Lista monitors ativos no Datadog com status de alerta.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "status": {"type": "string", "enum": ["Alert", "Warn", "No Data", "OK"], "default": "Alert"},
-                "tags": {"type": "array", "items": {"type": "string"}, "description": "Tags para filtrar (ex: ['env:prod'])"},
-                "priority": {"type": "integer", "description": "Prioridade 1-5"},
-            },
-        },
-    },
-    {
-        "name": "zabbix_get_active_problems",
-        "description": "Zabbix 7.x: busca problemas ativos via problem.get (mais preciso que trigger.get). Retorna eventos com status, severidade, duração e se está reconhecido.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "severity": {"type": "string", "enum": ["information", "warning", "average", "high", "disaster"], "description": "Severidade mínima"},
-                "group": {"type": "string", "description": "Nome do grupo de hosts"},
-                "host": {"type": "string", "description": "Hostname específico"},
-                "limit": {"type": "integer", "default": 30},
-            },
-        },
-    },
     {
         "name": "zabbix_get_item_latest",
-        "description": "Busca o último valor de um item de monitoramento no Zabbix (CPU, memória, disco, etc.).",
+        "description": "Busca o último valor de um item de monitoramento (CPU, memória, disco, etc.).",
         "input_schema": {
             "type": "object",
             "properties": {
                 "hostname": {"type": "string"},
-                "item_key": {"type": "string", "description": "Chave do item. Ex: system.cpu.util, vm.memory.size[available], vfs.fs.size[/,pfree]"},
+                "item_key": {"type": "string", "description": "Ex: system.cpu.util, vm.memory.size[available]"},
             },
             "required": ["hostname", "item_key"],
         },
@@ -97,26 +83,16 @@ MCP_TOOLS: list[dict] = [
         "description": "Lista todos os grupos de hosts cadastrados no Zabbix.",
         "input_schema": {"type": "object", "properties": {}},
     },
+    # Datadog
     {
-        "name": "datadog_get_logs",
-        "description": "Busca logs recentes no Datadog com filtro por query.",
+        "name": "datadog_get_active_monitors",
+        "description": "Lista monitors ativos no Datadog com status de alerta.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Query Datadog. Ex: 'service:api status:error', 'host:web-01 @http.status_code:500'", "default": "status:error"},
-                "from_minutes_ago": {"type": "integer", "default": 30},
-                "limit": {"type": "integer", "default": 20},
-            },
-        },
-    },
-    {
-        "name": "datadog_get_hosts",
-        "description": "Lista hosts monitorados no Datadog com status e apps.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "filter": {"type": "string", "description": "Filtro. Ex: 'env:prod', 'role:database'"},
-                "count": {"type": "integer", "default": 30},
+                "status": {"type": "string", "enum": ["Alert", "Warn", "No Data", "OK"], "default": "Alert"},
+                "tags": {"type": "array", "items": {"type": "string"}},
+                "priority": {"type": "integer"},
             },
         },
     },
@@ -126,11 +102,23 @@ MCP_TOOLS: list[dict] = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "metric": {"type": "string", "description": "Nome da métrica (ex: system.cpu.user)"},
+                "metric": {"type": "string"},
                 "host": {"type": "string"},
                 "from_minutes_ago": {"type": "integer", "default": 60},
             },
             "required": ["metric"],
+        },
+    },
+    {
+        "name": "datadog_get_logs",
+        "description": "Busca logs recentes no Datadog.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "default": "status:error"},
+                "from_minutes_ago": {"type": "integer", "default": 30},
+                "limit": {"type": "integer", "default": 20},
+            },
         },
     },
     {
@@ -144,14 +132,25 @@ MCP_TOOLS: list[dict] = [
             },
         },
     },
-    # Grafana
     {
-        "name": "grafana_get_firing_alerts",
-        "description": "Lista todos os alertas disparando no Grafana no momento.",
+        "name": "datadog_get_hosts",
+        "description": "Lista hosts monitorados no Datadog.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "folder": {"type": "string", "description": "Pasta de regras de alerta (opcional)"},
+                "filter": {"type": "string"},
+                "count": {"type": "integer", "default": 30},
+            },
+        },
+    },
+    # Grafana
+    {
+        "name": "grafana_get_firing_alerts",
+        "description": "Lista todos os alertas disparando no Grafana agora.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "folder": {"type": "string"},
             },
         },
     },
@@ -172,29 +171,28 @@ MCP_TOOLS: list[dict] = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "alert_type": {"type": "string", "description": "Tipo de alerta (ex: HTTP Server, Network, BGP)"},
+                "alert_type": {"type": "string"},
             },
         },
     },
     {
         "name": "thousandeyes_get_test_results",
-        "description": "Resultados recentes de um teste específico no ThousandEyes.",
+        "description": "Resultados recentes de um teste no ThousandEyes.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "test_id": {"type": "string", "description": "ID do teste"},
-                "window": {"type": "string", "default": "1h", "description": "Janela de tempo (ex: 1h, 6h, 24h)"},
+                "test_id": {"type": "string"},
+                "window": {"type": "string", "default": "1h"},
             },
             "required": ["test_id"],
         },
     },
 ]
 
-# Map tool name prefix to ToolName enum
 _TOOL_PREFIX_MAP: dict[str, ToolName] = {
-    "zabbix": ToolName.zabbix,
-    "datadog": ToolName.datadog,
-    "grafana": ToolName.grafana,
+    "zabbix":       ToolName.zabbix,
+    "datadog":      ToolName.datadog,
+    "grafana":      ToolName.grafana,
     "thousandeyes": ToolName.thousandeyes,
 }
 
@@ -207,8 +205,9 @@ def _tool_to_noc_name(tool_name: str) -> Optional[ToolName]:
 
 
 class AgentOrchestrator:
-    def __init__(self):
-        self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    def __init__(self) -> None:
+        # CR-2: AsyncAnthropic — never blocks the event loop
+        self._client = AsyncAnthropic(api_key=settings.anthropic_api_key)
         self._mcp_dispatcher: Optional["MCPDispatcher"] = None
 
     @property
@@ -224,38 +223,31 @@ class AgentOrchestrator:
         session: SessionData,
     ) -> AsyncGenerator[WSOutbound, None]:
         """
-        Process a user message and yield WSOutbound events:
-        tool_start → tool_end → agent_token (stream) → agent_done
+        Yields WSOutbound events: tool_start → tool_end → agent_token → agent_done
+        Uses real streaming (not fake chunking).
         """
-        from app.models import ChatMessage, MessageRole
-        # Append user message to session
+        if not settings.anthropic_api_key:
+            raise ValueError(
+                "ANTHROPIC_API_KEY não configurada. "
+                "Adicione sua chave no arquivo .env e reinicie o stack."
+            )
+
         session.messages.append(ChatMessage(role=MessageRole.user, content=user_message))
         await session_manager.save_session(session)
 
         system_prompt = get_system_prompt(session.user_profile)
         message_id = str(uuid.uuid4())[:8]
 
-        # Build messages for Claude
-        claude_messages = [
-            {
-                "role": "user" if m.role == MessageRole.user else "assistant",
-                "content": m.content,
-            }
-            for m in session.messages
-        ]
+        # CR-5 fix: build_claude_messages now correctly maps agent→assistant
+        claude_messages = session_manager.build_claude_messages(session)
 
-        # Agentic loop: Claude may call tools multiple times
         full_response = ""
         tools_used: set[ToolName] = set()
 
+        # Agentic loop
         while True:
-            if not settings.anthropic_api_key:
-                raise ValueError(
-                    "ANTHROPIC_API_KEY não configurada. "
-                    "Adicione sua chave no arquivo .env e reinicie o stack."
-                )
-
-            response = self._client.messages.create(
+            # Non-streaming probe to detect tool calls
+            probe = await self._client.messages.create(
                 model=settings.claude_model,
                 max_tokens=4096,
                 system=system_prompt,
@@ -263,45 +255,36 @@ class AgentOrchestrator:
                 messages=claude_messages,
             )
 
-            # Process response content blocks
-            text_parts: list[str] = []
-            tool_calls: list[dict] = []
+            tool_calls = [
+                {"id": b.id, "name": b.name, "input": b.input}
+                for b in probe.content
+                if b.type == "tool_use"
+            ]
 
-            for block in response.content:
-                if block.type == "text":
-                    text_parts.append(block.text)
-                elif block.type == "tool_use":
-                    tool_calls.append({
-                        "id": block.id,
-                        "name": block.name,
-                        "input": block.input,
-                    })
-
-            # Stream any text content token by token
-            if text_parts:
-                combined = "".join(text_parts)
-                # Simulate streaming by yielding chunks
-                chunk_size = 4
-                for i in range(0, len(combined), chunk_size):
-                    chunk = combined[i:i + chunk_size]
-                    full_response += chunk
-                    yield WSOutbound(
-                        type=WSEventType.agent_token,
-                        messageId=message_id,
-                        content=chunk,
-                    )
-
-            # If no tool calls, we're done
-            if not tool_calls or response.stop_reason == "end_turn":
+            # No tool calls → stream the final text response
+            if not tool_calls:
+                # CR-3: Real streaming — tokens arrive as Claude generates them
+                async with self._client.messages.stream(
+                    model=settings.claude_model,
+                    max_tokens=4096,
+                    system=system_prompt,
+                    messages=claude_messages,
+                ) as stream:
+                    async for text in stream.text_stream:
+                        full_response += text
+                        yield WSOutbound(
+                            type=WSEventType.agent_token,
+                            messageId=message_id,
+                            content=text,
+                        )
                 break
 
-            # Add assistant message with tool calls to history
+            # Execute tool calls
             claude_messages.append({
                 "role": "assistant",
-                "content": response.content,  # type: ignore[arg-type]
+                "content": probe.content,  # type: ignore[arg-type]
             })
 
-            # Execute tool calls
             tool_results = []
             for tc in tool_calls:
                 noc_tool = _tool_to_noc_name(tc["name"])
@@ -317,23 +300,19 @@ class AgentOrchestrator:
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": tc["id"],
-                    "content": json.dumps(result),
+                    "content": json.dumps(result, ensure_ascii=False),
                 })
 
-            # Add tool results to conversation
             claude_messages.append({"role": "user", "content": tool_results})
 
-        # Save agent response to session
+        # Persist complete response
         if full_response:
             session.messages.append(
                 ChatMessage(role=MessageRole.agent, content=full_response)
             )
             await session_manager.save_session(session)
 
-        yield WSOutbound(
-            type=WSEventType.agent_done,
-            messageId=message_id,
-        )
+        yield WSOutbound(type=WSEventType.agent_done, messageId=message_id)
 
 
 orchestrator = AgentOrchestrator()

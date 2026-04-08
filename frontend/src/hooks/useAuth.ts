@@ -5,16 +5,24 @@ import type { AuthState, AuthCredentials, User } from '../types'
 // ─── Auth Store (Zustand) ─────────────────────────────────────────────────────
 
 interface AuthStore extends AuthState {
+  isLoading: boolean
+  error: string | null
   login: (token: string, user: User) => void
   logout: () => void
+  setLoading: (v: boolean) => void
+  setError: (v: string | null) => void
 }
 
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   token: null,
   isAuthenticated: false,
-  login: (token, user) => set({ token, user, isAuthenticated: true }),
+  isLoading: false,
+  error: null,
+  login: (token, user) => set({ token, user, isAuthenticated: true, error: null }),
   logout: () => set({ token: null, user: null, isAuthenticated: false }),
+  setLoading: (v) => set({ isLoading: v }),
+  setError: (v) => set({ error: v }),
 }))
 
 // ─── useAuth Hook ─────────────────────────────────────────────────────────────
@@ -30,15 +38,15 @@ interface UseAuthReturn {
   logout: () => void
 }
 
-import { useState } from 'react'
-
 export function useAuth(): UseAuthReturn {
-  const { user, isAuthenticated, login: storeLogin, logout: storeLogout } = useAuthStore()
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const {
+    user, isAuthenticated, isLoading, error,
+    login: storeLogin, logout: storeLogout,
+    setLoading, setError,
+  } = useAuthStore()
 
   const login = useCallback(async (credentials: AuthCredentials) => {
-    setIsLoading(true)
+    setLoading(true)
     setError(null)
 
     try {
@@ -58,9 +66,9 @@ export function useAuth(): UseAuthReturn {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao fazer login')
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
-  }, [storeLogin])
+  }, [storeLogin, setLoading, setError])
 
   const logout = useCallback(() => {
     storeLogout()

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth, useAuthStore } from '../hooks/useAuth'
 
 export function LoginPage() {
   const { login, isLoading, error } = useAuth()
@@ -11,7 +11,10 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     await login({ email, password })
-    navigate('/chat')
+    // CR-1: only navigate if login actually succeeded
+    if (useAuthStore.getState().isAuthenticated) {
+      navigate('/chat')
+    }
   }
 
   return (

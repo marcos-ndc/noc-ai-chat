@@ -7,8 +7,11 @@ interface ChatMessageProps {
   message: Message
 }
 
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+function formatTime(date: Date | string): string {
+  // AL-4: timestamps from WS arrive as ISO strings, not Date objects
+  const d = date instanceof Date ? date : new Date(date)
+  if (isNaN(d.getTime())) return '--:--'
+  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {

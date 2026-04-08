@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { VoiceInputButton } from '../VoiceInput/VoiceInputButton'
 import { VoiceOutputToggle } from '../VoiceOutput/VoiceOutputToggle'
 import { useVoiceInput } from '../../hooks/useVoiceInput'
-import { useVoiceOutput } from '../../hooks/useVoiceOutput'
 import type { VoiceOutputState } from '../../types'
 
 interface ChatInputProps {
@@ -33,8 +32,6 @@ export function ChatInput({
       textareaRef.current?.focus()
     },
   })
-
-  const voiceOutput = useVoiceOutput()
 
   // Auto-resize textarea
   useEffect(() => {
@@ -140,9 +137,9 @@ export function ChatInput({
         <VoiceOutputToggle
           enabled={voiceOutputEnabled}
           state={voiceOutputState}
-          isSupported={voiceOutput.isSupported}
+          isSupported={'speechSynthesis' in window}
           onToggle={onVoiceOutputToggle ?? (() => {})}
-          onStop={onVoiceOutputStop ?? voiceOutput.stop}
+          onStop={onVoiceOutputStop ?? (() => {})}
         />
       </div>
     </div>
