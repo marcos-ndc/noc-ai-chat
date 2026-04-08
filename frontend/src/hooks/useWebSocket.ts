@@ -25,6 +25,7 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}): Us
   const intentionalCloseRef = useRef(false)
 
   const connect = useCallback(() => {
+    if (!url) return                                          // sem URL/token, não conecta
     if (wsRef.current?.readyState === WebSocket.OPEN) return
 
     const ws = new WebSocket(url)
