@@ -105,7 +105,24 @@ def _tool_to_noc_name(tool_name: str) -> Optional[ToolName]:
 class AgentOrchestrator:
     def __init__(self) -> None:
         # CR-2: AsyncAnthropic — non-blocking, never stalls the event loop
-        self._client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+        # Corporate proxy/SSL support via environment variables:
+        #   ANTHROPIC_SSL_VERIFY=false  — disable SSL verification (last resort)
+        #   REQUESTS_CA_BUNDLE=/path/to/corp-ca.pem  — custom CA bundle
+        import httpx, os
+        ca_cert = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
+        ssl_verify = os.environ.get("ANTHROPIC_SSL_VERIFY", "true").lower() != "false"
+
+        if ca_cert:
+            http_client = httpx.AsyncClient(verify=ca_cert)
+            self._client = AsyncAnthropic(api_key=settings.anthropic_api_key, http_client=http_client)
+        elif not ssl_verify:
+            import warnings
+            warnings.warn("SSL verification disabled for Anthropic API — not recommended for production")
+            http_client = httpx.AsyncClient(verify=False)
+            self._client = AsyncAnthropic(api_key=settings.anthropic_api_key, http_client=http_client)
+        else:
+            self._client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+
         self._mcp_dispatcher: Optional["MCPDispatcher"] = None
 
     @property
