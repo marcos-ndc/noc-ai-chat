@@ -23,6 +23,13 @@ log = structlog.get_logger()
 # ─── Lifespan ────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Validate critical configuration on startup
+    if not settings.anthropic_api_key:
+        log.warning(
+            "noc_ai_chat.config_warning",
+            message="ANTHROPIC_API_KEY não configurada — o agente não conseguirá responder. "
+                    "Adicione a chave no .env e reinicie.",
+        )
     log.info("noc_ai_chat.started", model=settings.claude_model)
     yield
     log.info("noc_ai_chat.stopped")

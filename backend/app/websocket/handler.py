@@ -123,9 +123,15 @@ async def handle_chat_websocket(ws: WebSocket) -> None:
 
             except Exception as e:
                 log.error("ws.agent_error", error=str(e), session_id=session_id)
+                # Send the actual error message to help diagnose config issues
+                error_msg = str(e)
+                if "ANTHROPIC_API_KEY" in error_msg or "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
+                    error_msg = "⚠️ ANTHROPIC_API_KEY não configurada. Adicione no .env e reinicie com `make dev`."
+                elif "Connection error" in error_msg or "connect" in error_msg.lower():
+                    error_msg = "⚠️ Erro de conexão com a API Anthropic. Verifique sua ANTHROPIC_API_KEY no .env."
                 await manager.send(connection_id, WSOutbound(
                     type=WSEventType.error,
-                    error="Erro interno ao processar sua mensagem. Tente novamente.",
+                    error=error_msg,
                 ))
 
     except WebSocketDisconnect:
