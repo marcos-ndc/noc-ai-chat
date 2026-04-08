@@ -249,6 +249,12 @@ class AgentOrchestrator:
         tools_used: set[ToolName] = set()
 
         while True:
+            if not settings.anthropic_api_key:
+                raise ValueError(
+                    "ANTHROPIC_API_KEY não configurada. "
+                    "Adicione sua chave no arquivo .env e reinicie o stack."
+                )
+
             response = self._client.messages.create(
                 model=settings.claude_model,
                 max_tokens=4096,
