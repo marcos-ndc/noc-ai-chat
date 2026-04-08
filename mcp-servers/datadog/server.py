@@ -25,7 +25,8 @@ DD_APP_KEY  = os.getenv("DATADOG_APP_KEY", "")
 DD_SITE     = os.getenv("DATADOG_SITE", "datadoghq.com")
 DD_TIMEOUT  = int(os.getenv("DATADOG_TIMEOUT", "10"))
 # Proxy corporativo: SSL_VERIFY=false para ambientes com inspeção SSL
-DD_SSL_VERIFY = os.getenv("DATADOG_SSL_VERIFY", os.getenv("SSL_VERIFY", "true")).lower() != "false"
+# Default false for corporate environments with SSL inspection
+DD_SSL_VERIFY = os.getenv("DATADOG_SSL_VERIFY", os.getenv("SSL_VERIFY", "false")).lower() != "false"
 
 MOCK_MODE = not bool(DD_API_KEY)
 DD_BASE   = f"https://api.{DD_SITE}"
