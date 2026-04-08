@@ -43,7 +43,16 @@ class Settings(BaseSettings):
 
     # App
     log_level: str = "INFO"
-    cors_origins: list[str] = ["http://localhost:3000"]
+    # Em desenvolvimento aceita qualquer origem local
+    # Em produção, defina explicitamente no .env:
+    # CORS_ORIGINS=["https://seu-dominio.com","https://app.seu-dominio.com"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ]
+    cors_allow_all: bool = True  # True em dev, False em produção
 
 
 settings = Settings()
