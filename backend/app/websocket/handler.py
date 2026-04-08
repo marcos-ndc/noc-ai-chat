@@ -122,13 +122,26 @@ async def handle_chat_websocket(ws: WebSocket) -> None:
                     await manager.send(connection_id, event)
 
             except Exception as e:
-                log.error("ws.agent_error", error=str(e), session_id=session_id)
-                # Send the actual error message to help diagnose config issues
-                error_msg = str(e)
-                if "ANTHROPIC_API_KEY" in error_msg or "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
-                    error_msg = "⚠️ ANTHROPIC_API_KEY não configurada. Adicione no .env e reinicie com `make dev`."
-                elif "Connection error" in error_msg or "connect" in error_msg.lower():
-                    error_msg = "⚠️ Erro de conexão com a API Anthropic. Verifique sua ANTHROPIC_API_KEY no .env."
+                import traceback
+                error_type = type(e).__name__
+                error_detail = str(e)
+                tb = traceback.format_exc()
+                log.error("ws.agent_error",
+                    error=error_detail,
+                    error_type=error_type,
+                    traceback=tb,
+                    session_id=session_id,
+                )
+                # Build user-friendly message based on error type
+                error_msg = error_detail
+                if "ANTHROPIC_API_KEY" in error_msg or "authentication" in error_msg.lower():
+                    error_msg = "⚠️ ANTHROPIC_API_KEY inválida ou não configurada."
+                elif "SSL" in error_msg or "certificate" in error_msg.lower():
+                    error_msg = "⚠️ Erro de certificado SSL. Verifique o proxy corporativo (veja docs/CORPORATE-PROXY.md)."
+                elif "Connection error" in error_msg or "ConnectError" in error_type:
+                    error_msg = f"⚠️ Erro de conexão com api.anthropic.com. Possível bloqueio de proxy/firewall. Detalhe: {error_detail}"
+                elif "timeout" in error_msg.lower() or "Timeout" in error_type:
+                    error_msg = "⚠️ Timeout na API Anthropic. Tente novamente."
                 await manager.send(connection_id, WSOutbound(
                     type=WSEventType.error,
                     error=error_msg,
