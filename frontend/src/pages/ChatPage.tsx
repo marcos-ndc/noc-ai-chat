@@ -91,23 +91,20 @@ export function ChatPage() {
         setActiveTools([])
         const msgId = currentAgentMsgId.current
 
-        setMessages(prev =>
-          prev.map(m =>
-            m.id === msgId
-              ? { ...m, status: 'done' as const }
-              : m
+        setMessages(prev => {
+          const updated = prev.map(m =>
+            m.id === msgId ? { ...m, status: 'done' as const } : m
           )
-        )
-
-        // TTS
-        if (voiceOutputEnabled) {
-          const doneMsg = messages.find(m => m.id === msgId)
-          if (doneMsg) {
-            // Strip markdown for TTS
-            const plainText = doneMsg.content.replace(/[#*`_~\[\]]/g, '').trim()
-            voiceOutput.speak(plainText)
+          // TTS — read content from updated state, no external dep on messages
+          if (voiceOutputEnabled && msgId) {
+            const doneMsg = updated.find(m => m.id === msgId)
+            if (doneMsg) {
+              const plainText = doneMsg.content.replace(/[#*`_~\[\]]/g, '').trim()
+              voiceOutput.speak(plainText)
+            }
           }
-        }
+          return updated
+        })
 
         currentAgentMsgId.current = null
         break
@@ -127,7 +124,7 @@ export function ChatPage() {
         break
       }
     }
-  }, [voiceOutputEnabled, voiceOutput, messages])
+  }, [voiceOutputEnabled, voiceOutput])
 
   const { isConnected, send } = useWebSocket(wsUrl ?? '', {
     onMessage: handleWSMessage,
