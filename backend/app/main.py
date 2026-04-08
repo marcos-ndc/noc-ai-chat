@@ -36,12 +36,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Em dev (cors_allow_all=True) aceita qualquer origem
+# Em prod define CORS_ALLOW_ALL=false e CORS_ORIGINS no .env
+_origins = ["*"] if settings.cors_allow_all else settings.cors_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_origins=_origins,
+    allow_credentials=not settings.cors_allow_all,  # credentials não funciona com *
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # ─── Routers ─────────────────────────────────────────────────────────────────

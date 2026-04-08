@@ -36,6 +36,8 @@ services:
       - ./backend/app:/app/app
       - ./backend/tests:/app/tests
     env_file: .env
+    environment:
+      - CORS_ALLOW_ALL=true
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       redis:
