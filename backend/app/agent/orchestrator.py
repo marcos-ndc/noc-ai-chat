@@ -3,7 +3,10 @@ import uuid
 from collections.abc import AsyncGenerator
 from typing import Optional
 
+import structlog
 from anthropic import AsyncAnthropic
+
+log = structlog.get_logger()
 
 from app.agent.prompt import get_system_prompt
 from app.agent.session import session_manager
@@ -195,6 +198,12 @@ class AgentOrchestrator:
                 if b.type == "tool_use"
             ]
 
+            log.info("orchestrator.iteration",
+                stop_reason=final_msg.stop_reason,
+                tool_calls=[tc["name"] for tc in tool_calls],
+                streamed_chars=len(streamed_text),
+            )
+
             # No tool calls → done
             if not tool_calls:
                 break
@@ -212,7 +221,13 @@ class AgentOrchestrator:
                 if noc_tool:
                     yield WSOutbound(type=WSEventType.tool_start, tool=noc_tool)
 
+                log.info("orchestrator.tool_call", tool=tc["name"], input=tc["input"])
                 result = await self.mcp_dispatcher.call(tc["name"], tc["input"])
+                log.info("orchestrator.tool_result",
+                    tool=tc["name"],
+                    has_error="error" in result if isinstance(result, dict) else False,
+                    result_keys=list(result.keys()) if isinstance(result, dict) else type(result).__name__,
+                )
 
                 if noc_tool:
                     yield WSOutbound(type=WSEventType.tool_end, tool=noc_tool)
