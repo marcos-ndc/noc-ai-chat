@@ -20,14 +20,25 @@ from app.settings import settings
 
 MCP_TOOLS: list[dict] = [
     # Zabbix
+    {"name": "zabbix_list_organizations",
+     "description": "Lista todos os clientes/organizações monitorados no Zabbix via tag 'Organization'. Use quando o usuário perguntar quais clientes estão monitorados.",
+     "input_schema": {"type": "object", "properties": {}}},
+    {"name": "zabbix_get_organization_summary",
+     "description": "Resumo completo de um cliente: hosts, disponibilidade, problemas ativos por severidade. Use para visão geral de um cliente específico.",
+     "input_schema": {"type": "object", "properties": {
+         "organization": {"type": "string", "description": "Valor da tag Organization (nome do cliente)"}},
+         "required": ["organization"]}},
     {"name": "zabbix_get_active_alerts",
-     "description": "Busca alertas ativos no Zabbix. Filtre por severidade e grupo de hosts.",
+     "description": "Busca alertas ativos no Zabbix. Filtre por organização (cliente), severidade, grupo ou host.",
      "input_schema": {"type": "object", "properties": {
-         "severity": {"type": "string", "enum": ["disaster", "high", "average", "warning", "info"]},
-         "group": {"type": "string"}, "limit": {"type": "integer", "default": 20}}}},
+         "organization": {"type": "string", "description": "Tag Organization do cliente"},
+         "severity": {"type": "string", "enum": ["disaster", "high", "average", "warning", "information"]},
+         "group": {"type": "string"}, "host": {"type": "string"},
+         "limit": {"type": "integer", "default": 30}}}},
     {"name": "zabbix_get_active_problems",
-     "description": "Zabbix 7.x: busca problemas ativos. Retorna eventos com status, severidade, duração.",
+     "description": "Zabbix 7.x: problemas ativos via problem.get. Suporta filtro por organização/cliente.",
      "input_schema": {"type": "object", "properties": {
+         "organization": {"type": "string", "description": "Tag Organization do cliente"},
          "severity": {"type": "string", "enum": ["information", "warning", "average", "high", "disaster"]},
          "group": {"type": "string"}, "host": {"type": "string"}, "limit": {"type": "integer", "default": 30}}}},
     {"name": "zabbix_get_host_status",
