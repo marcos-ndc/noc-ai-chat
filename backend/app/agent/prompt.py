@@ -12,7 +12,13 @@ _BASE_PROMPT = """Você é o Agente de IA da NOC (Network Operations Center), es
   - `zabbix_get_item_latest` — valor atual de uma métrica (CPU, disco, memória)
 - **Datadog**: monitors, métricas, logs, incidentes, dashboards
 - **Grafana**: alertas, regras, painéis, datasources
-- **ThousandEyes**: testes de rede, alertas, path visualization, BGP
+- **ThousandEyes**:
+  - `thousandeyes_list_tests` — lista todos os testes configurados
+  - `thousandeyes_get_active_alerts` — alertas ativos (HTTP, DNS, Network, BGP)
+  - `thousandeyes_get_test_availability` — disponibilidade de todos os testes com threshold
+  - `thousandeyes_get_test_results` — métricas de um teste (availability, response time, loss)
+  - `thousandeyes_get_bgp_alerts` — alertas BGP (hijacks, route leaks)
+  - `thousandeyes_get_agents` — agentes enterprise e cloud disponíveis
 
 ## Clientes multi-tenant (Zabbix)
 Os clientes são identificados pela tag **Organization** nos hosts do Zabbix.

@@ -93,14 +93,32 @@ MCP_TOOLS: list[dict] = [
      "input_schema": {"type": "object", "properties": {
          "state": {"type": "string", "enum": ["firing", "pending", "normal", "error"]}}}},
     # ThousandEyes
+    # ThousandEyes
+    {"name": "thousandeyes_list_tests",
+     "description": "Lista todos os testes configurados no ThousandEyes (HTTP, DNS, Network, BGP, etc.).",
+     "input_schema": {"type": "object", "properties": {}}},
     {"name": "thousandeyes_get_active_alerts",
-     "description": "Lista alertas ativos no ThousandEyes.",
-     "input_schema": {"type": "object", "properties": {"alert_type": {"type": "string"}}}},
-    {"name": "thousandeyes_get_test_results",
-     "description": "Resultados recentes de um teste no ThousandEyes.",
+     "description": "Lista alertas ativos no ThousandEyes. Filtre por tipo (HTTP Server, Network, BGP, DNS).",
      "input_schema": {"type": "object", "properties": {
-         "test_id": {"type": "string"}, "window": {"type": "string", "default": "1h"}},
-         "required": ["test_id"]}},
+         "alert_type": {"type": "string", "description": "Tipo: HTTP Server, Network, BGP, DNS"},
+         "test_name": {"type": "string", "description": "Filtro parcial por nome do teste"}}}},
+    {"name": "thousandeyes_get_test_results",
+     "description": "Resultados e métricas de um teste específico (availability, response time, packet loss).",
+     "input_schema": {"type": "object", "properties": {
+         "test_id": {"type": "string"}, "window": {"type": "string", "default": "1h",
+         "description": "Janela: 1h, 6h, 24h, 7d"}}, "required": ["test_id"]}},
+    {"name": "thousandeyes_get_test_availability",
+     "description": "Verifica disponibilidade de todos os testes. Identifica testes degradados abaixo de um threshold.",
+     "input_schema": {"type": "object", "properties": {
+         "test_name": {"type": "string", "description": "Filtro parcial por nome"},
+         "window": {"type": "string", "default": "1h"},
+         "threshold_pct": {"type": "number", "default": 99.0, "description": "% mínimo de disponibilidade"}}}},
+    {"name": "thousandeyes_get_bgp_alerts",
+     "description": "Lista alertas BGP ativos (route leaks, hijacks, mudanças de path).",
+     "input_schema": {"type": "object", "properties": {}}},
+    {"name": "thousandeyes_get_agents",
+     "description": "Lista agentes ThousandEyes disponíveis (enterprise e cloud) com localização e status.",
+     "input_schema": {"type": "object", "properties": {}}},
 ]
 
 _TOOL_PREFIX_MAP: dict[str, ToolName] = {
