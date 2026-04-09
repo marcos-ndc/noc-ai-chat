@@ -95,16 +95,22 @@ class DatadogClient:
 import asyncio
 
 _dd = DatadogClient()
+_auth_ok: bool = False   # cached at startup, updated by health
+_auth_latency: float = 0.0
 
 
 # ─── App ──────────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _auth_ok, _auth_latency
     if not MOCK_MODE:
+        t0 = time.monotonic()
         ok, err = await _dd.validate()
+        _auth_ok = ok
+        _auth_latency = round((time.monotonic() - t0) * 1000, 1)
         if ok:
-            log.info(f"datadog.startup: autenticado — site={DD_SITE}, url={DD_BASE}")
+            log.info(f"datadog.startup: autenticado — site={DD_SITE}, url={DD_BASE}, latency={_auth_latency}ms")
         else:
             # Diagnose the type of failure
             if "SSL" in err or "certificate" in err.lower() or "CERTIFICATE" in err:
@@ -400,21 +406,36 @@ async def get_hosts(body: GetHostsInput):
 
 @app.get("/health")
 async def health():
+    """Returns cached auth status — does NOT call Datadog API on every health check."""
     if MOCK_MODE:
         return {"status": "ok", "mode": "mock",
                 "message": "Configure DATADOG_API_KEY para modo real"}
+    return {
+        "status": "ok" if _auth_ok else "degraded",
+        "mode": "real",
+        "authenticated": _auth_ok,
+        "site": DD_SITE,
+        "startup_latency_ms": _auth_latency,
+    }
+
+
+# ─── Debug endpoint ──────────────────────────────────────────────────────────
+
+@app.get("/debug/monitors")
+async def debug_monitors():
+    """Test endpoint — calls Datadog API directly and returns raw response."""
+    if MOCK_MODE:
+        return {"mode": "mock", "data": _mock_monitors()}
     try:
-        t0 = time.monotonic()
-        await _dd.validate()
-        latency_ms = (time.monotonic() - t0) * 1000
+        data = await _dd.get("/api/v1/monitor", {"page_size": 3})
         return {
-            "status": "ok",
             "mode": "real",
-            "site": DD_SITE,
-            "latency_ms": round(latency_ms, 1),
+            "response_type": type(data).__name__,
+            "data_preview": str(data)[:500] if not isinstance(data, (list, dict)) else data[:3] if isinstance(data, list) else data,
         }
     except Exception as e:
-        return {"status": "down", "error": str(e), "mode": "real"}
+        import traceback
+        return {"mode": "real", "error": str(e), "type": type(e).__name__, "traceback": traceback.format_exc()}
 
 
 # ─── Mock data ────────────────────────────────────────────────────────────────
