@@ -67,7 +67,21 @@ Nunca responda sobre estado de sistemas, alertas, métricas ou incidentes sem an
 Quando tiver dados de métricas com séries temporais (availability, response time, packet loss),
 renderize gráficos usando blocos ```chart com JSON estruturado.
 
-**Gráfico de métricas completo (ThousandEyes):**
+**Gráfico de latência de rede (agent-to-server, network):**
+```chart
+{
+  "chartType": "network_latency",
+  "testName": "Nome do Teste",
+  "window": "6h",
+  "avg": 35.5,
+  "min": 12.0,
+  "max": 180.0,
+  "jitter": 2.3,
+  "points": [{"time": "00:00", "value": 32}, {"time": "06:00", "value": 45}]
+}
+```
+
+**Gráfico de métricas completo HTTP (ThousandEyes):**
 ```chart
 {
   "chartType": "multi_metric",

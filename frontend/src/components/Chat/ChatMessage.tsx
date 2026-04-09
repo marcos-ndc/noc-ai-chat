@@ -5,7 +5,7 @@ import { TOOL_METADATA } from '../../types'
 import { parseMessageWithCharts } from '../Charts/chartParser'
 import {
   AvailabilityChart, ResponseTimeChart, PacketLossChart,
-  MetricDashboard, AvailabilitySummaryChart,
+  MetricDashboard, AvailabilitySummaryChart, NetworkLatencyChart,
 } from '../Charts/NocCharts'
 
 // ─── AgentContent — renders markdown + inline charts ─────────────────────────
@@ -33,6 +33,7 @@ function AgentContent({ content, isStreaming }: { content: string; isStreaming: 
             {chart.type === 'availability' && <AvailabilityChart data={chart.data} />}
             {chart.type === 'response_time' && <ResponseTimeChart data={chart.data} />}
             {chart.type === 'packet_loss' && <PacketLossChart data={chart.data} />}
+            {chart.type === 'network_latency' && <NetworkLatencyChart data={chart.data} />}
             {chart.type === 'availability_summary' && (
               <AvailabilitySummaryChart tests={chart.data.tests} threshold={chart.data.threshold} />
             )}
