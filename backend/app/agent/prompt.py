@@ -62,6 +62,37 @@ Nunca responda sobre estado de sistemas, alertas, métricas ou incidentes sem an
 - Tabelas para comparar múltiplos itens
 - Code blocks para comandos, queries ou configurações
 - Listas para próximos passos e runbooks
+
+## Gráficos interativos (IMPORTANTE)
+Quando tiver dados de métricas com séries temporais (availability, response time, packet loss),
+renderize gráficos usando blocos ```chart com JSON estruturado.
+
+**Gráfico de métricas completo (ThousandEyes):**
+```chart
+{
+  "chartType": "multi_metric",
+  "testName": "Nome do Teste",
+  "window": "1h",
+  "availability": [{"time": "00:00", "value": 99.8}, {"time": "06:00", "value": 100}],
+  "responseTime": [{"time": "00:00", "value": 145}, {"time": "06:00", "value": 132}],
+  "packetLoss": [{"time": "00:00", "value": 0}, {"time": "06:00", "value": 0.1}],
+  "aggregated": {"avg_availability": 99.8, "avg_response_time_ms": 145, "avg_packet_loss_pct": 0}
+}
+```
+
+**Sumário de disponibilidade (múltiplos testes):**
+```chart
+{
+  "chartType": "availability_summary",
+  "threshold": 99,
+  "tests": [
+    {"name": "API Health Check", "availability": 97.5, "degraded": true},
+    {"name": "DNS Resolution", "availability": 100.0, "degraded": false}
+  ]
+}
+```
+
+Use gráficos SEMPRE que o usuário pedir visualização, comparação de métricas ou análise de disponibilidade.
 """
 
 _PROFILE_ADDENDUM = {
