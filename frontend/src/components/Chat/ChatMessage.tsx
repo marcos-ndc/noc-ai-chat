@@ -2,6 +2,49 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Message } from '../../types'
 import { TOOL_METADATA } from '../../types'
+import { parseMessageWithCharts } from '../Charts/chartParser'
+import {
+  AvailabilityChart, ResponseTimeChart, PacketLossChart,
+  MetricDashboard, AvailabilitySummaryChart,
+} from '../Charts/NocCharts'
+
+// ─── AgentContent — renders markdown + inline charts ─────────────────────────
+
+function AgentContent({ content, isStreaming }: { content: string; isStreaming: boolean }) {
+  const { segments, textParts, charts } = parseMessageWithCharts(content)
+
+  return (
+    <div className={isStreaming ? 'typing-cursor' : ''}>
+      {segments.map((seg, i) => {
+        if (seg.kind === 'text') {
+          const text = textParts[seg.index]
+          if (!text?.trim()) return null
+          return (
+            <div key={i} className="markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+            </div>
+          )
+        }
+        const chart = charts[seg.index]
+        if (!chart) return null
+        return (
+          <div key={i} className="-mx-4">
+            {chart.type === 'multi_metric' && <MetricDashboard data={chart.data} />}
+            {chart.type === 'availability' && <AvailabilityChart data={chart.data} />}
+            {chart.type === 'response_time' && <ResponseTimeChart data={chart.data} />}
+            {chart.type === 'packet_loss' && <PacketLossChart data={chart.data} />}
+            {chart.type === 'availability_summary' && (
+              <AvailabilitySummaryChart tests={chart.data.tests} threshold={chart.data.threshold} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+
+// ─── ChatMessage ──────────────────────────────────────────────────────────────
 
 interface ChatMessageProps {
   message: Message
@@ -44,11 +87,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           {isUser ? (
             <p>{message.content}</p>
           ) : (
-            <div className={`markdown-body ${isStreaming ? 'typing-cursor' : ''}`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {message.content || ' '}
-              </ReactMarkdown>
-            </div>
+            <AgentContent content={message.content || ' '} isStreaming={isStreaming} />
           )}
 
           {/* Accent line for agent messages */}
