@@ -198,6 +198,80 @@ export function PacketLossChart({ data }: { data: PacketLossData }) {
   )
 }
 
+// ─── Network Latency Chart (agent-to-server) ─────────────────────────────────
+
+export interface NetworkLatencyData {
+  testName: string
+  window: string
+  points: TimeSeriesPoint[]
+  minPoints?: TimeSeriesPoint[]
+  maxPoints?: TimeSeriesPoint[]
+  avg: number
+  min?: number
+  max?: number
+  jitter?: number
+}
+
+export function NetworkLatencyChart({ data }: { data: NetworkLatencyData }) {
+  const color = data.avg < 50 ? '#10b981' : data.avg < 150 ? '#f59e0b' : '#ef4444'
+
+  // Merge avg, min, max into single data array
+  const chartData = data.points.map((p, i) => ({
+    time: p.time,
+    avg: p.value,
+    min: data.minPoints?.[i]?.value,
+    max: data.maxPoints?.[i]?.value,
+  }))
+
+  return (
+    <div className="bg-noc-surface border border-noc-border rounded-xl p-4 my-2">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🌐</span>
+          <span className="text-sm font-semibold text-noc-text">Latência de Rede</span>
+          {data.testName && (
+            <span className="text-xs text-noc-muted font-mono truncate max-w-[200px]">— {data.testName}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs font-mono">
+          <span className="text-noc-muted">{data.window}</span>
+          <span style={{ color }}>avg {data.avg?.toFixed(1)}ms</span>
+          {data.jitter !== undefined && (
+            <span className="text-noc-muted">jitter {data.jitter?.toFixed(1)}ms</span>
+          )}
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={150}>
+        <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 0, left: -10 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(30,45,74,0.5)" />
+          <XAxis dataKey="time" tick={{ fill: '#6b7280', fontSize: 10, fontFamily: 'JetBrains Mono' }} />
+          <YAxis tick={{ fill: '#6b7280', fontSize: 10, fontFamily: 'JetBrains Mono' }}
+            tickFormatter={(v) => `${v}ms`} />
+          <Tooltip content={<NocTooltip unit="ms" />} />
+          {data.max && <ReferenceLine y={data.max} stroke="#ef444460" strokeDasharray="2 2" />}
+          {chartData[0]?.max !== undefined && (
+            <Line type="monotone" dataKey="max" name="Max" stroke="#ef444480"
+              strokeWidth={1} dot={false} strokeDasharray="3 3" />
+          )}
+          {chartData[0]?.min !== undefined && (
+            <Line type="monotone" dataKey="min" name="Min" stroke="#10b98180"
+              strokeWidth={1} dot={false} strokeDasharray="3 3" />
+          )}
+          <Line type="monotone" dataKey="avg" name="Avg Latency"
+            stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: color }} />
+        </LineChart>
+      </ResponsiveContainer>
+      <div className="flex items-center gap-4 mt-2 text-[10px] font-mono text-noc-muted">
+        <span style={{ color }}>── Avg: {data.avg?.toFixed(1)}ms</span>
+        {data.min !== undefined && <span className="text-noc-success">-- Min: {data.min?.toFixed(1)}ms</span>}
+        {data.max !== undefined && <span className="text-noc-danger">-- Max: {data.max?.toFixed(1)}ms</span>}
+        {data.jitter !== undefined && <span>Jitter: {data.jitter?.toFixed(1)}ms</span>}
+      </div>
+    </div>
+  )
+}
+
+
 // ─── Multi-Metric Dashboard ───────────────────────────────────────────────────
 
 export function MetricDashboard({ data }: { data: MultiMetricData }) {

@@ -190,43 +190,71 @@ async def get_test_results(body: GetTestResultsInput):
         test = test_data.get("test", {})
         test_type = test.get("type", "")
 
-        # Endpoint de resultados varia por tipo
-        result_path = {
-            "http-server": f"/test-results/{body.test_id}/http-server",
-            "page-load": f"/test-results/{body.test_id}/page-load",
-            "dns-server": f"/test-results/{body.test_id}/dns-server",
-            "network": f"/test-results/{body.test_id}/network/metrics",
-            "agent-to-server": f"/test-results/{body.test_id}/network/metrics",
-            "bgp": f"/test-results/{body.test_id}/bgp/routes",
-        }.get(test_type, f"/test-results/{body.test_id}/http-server")
+        # Endpoints corretos da API ThousandEyes v7 por tipo de teste
+        RESULT_PATHS = {
+            "http-server":      f"/test-results/{body.test_id}/http-server",
+            "page-load":        f"/test-results/{body.test_id}/page-load",
+            "dns-server":       f"/test-results/{body.test_id}/dns-server",
+            "dns-trace":        f"/test-results/{body.test_id}/dns-trace",
+            "network":          f"/test-results/{body.test_id}/network/latency",
+            "agent-to-server":  f"/test-results/{body.test_id}/network/latency",
+            "agent-to-agent":   f"/test-results/{body.test_id}/network/latency",
+            "bgp":              f"/test-results/{body.test_id}/bgp/routes",
+            "ftp-server":       f"/test-results/{body.test_id}/ftp-server",
+            "sip-server":       f"/test-results/{body.test_id}/sip-server",
+            "voice":            f"/test-results/{body.test_id}/voice/metrics",
+        }
+        result_path = RESULT_PATHS.get(test_type, f"/test-results/{body.test_id}/http-server")
 
         results_data = await _te.get(result_path, {"window": body.window})
         results = results_data.get("results", [])
 
-        # Calcula métricas agregadas
-        if results:
-            avail_values = [r.get("availability") for r in results if r.get("availability") is not None]
-            resp_times = [r.get("responseTime") for r in results if r.get("responseTime") is not None]
-            loss_values = [r.get("loss") for r in results if r.get("loss") is not None]
+        # Métricas variam por tipo de teste
+        is_network = test_type in ("network", "agent-to-server", "agent-to-agent")
 
-            avg_avail = sum(avail_values) / len(avail_values) if avail_values else None
-            avg_resp = sum(resp_times) / len(resp_times) if resp_times else None
-            avg_loss = sum(loss_values) / len(loss_values) if loss_values else None
+        if results:
+            if is_network:
+                # Network tests: latency (avg/min/max), loss, jitter
+                latency_vals = [r.get("avgLatency") or r.get("latency") for r in results
+                                if r.get("avgLatency") or r.get("latency")]
+                loss_vals = [r.get("loss") for r in results if r.get("loss") is not None]
+                jitter_vals = [r.get("jitter") for r in results if r.get("jitter") is not None]
+                avg_resp = sum(latency_vals) / len(latency_vals) if latency_vals else None
+                avg_loss = sum(loss_vals) / len(loss_vals) if loss_vals else None
+                avg_jitter = sum(jitter_vals) / len(jitter_vals) if jitter_vals else None
+                avg_avail = None  # network tests don't have availability field
+            else:
+                avail_vals = [r.get("availability") for r in results if r.get("availability") is not None]
+                resp_times = [r.get("responseTime") or r.get("connectTime") for r in results
+                              if r.get("responseTime") or r.get("connectTime")]
+                loss_vals = [r.get("loss") for r in results if r.get("loss") is not None]
+                avg_avail = sum(avail_vals) / len(avail_vals) if avail_vals else None
+                avg_resp = sum(resp_times) / len(resp_times) if resp_times else None
+                avg_loss = sum(loss_vals) / len(loss_vals) if loss_vals else None
+                avg_jitter = None
         else:
-            avg_avail = avg_resp = avg_loss = None
+            avg_avail = avg_resp = avg_loss = avg_jitter = None
+
+        aggregated: dict = {}
+        if avg_avail is not None:
+            aggregated["avg_availability"] = round(avg_avail, 2)
+        if avg_resp is not None:
+            key = "avg_latency_ms" if is_network else "avg_response_time_ms"
+            aggregated[key] = round(avg_resp, 1)
+        if avg_loss is not None:
+            aggregated["avg_packet_loss_pct"] = round(avg_loss, 2)
+        if avg_jitter is not None:
+            aggregated["avg_jitter_ms"] = round(avg_jitter, 2)
 
         return {
             "testId": body.test_id,
             "testName": test.get("testName"),
             "testType": test_type,
+            "isNetworkTest": is_network,
             "window": body.window,
             "result_count": len(results),
-            "aggregated": {
-                "avg_availability": round(avg_avail, 2) if avg_avail is not None else None,
-                "avg_response_time_ms": round(avg_resp, 1) if avg_resp is not None else None,
-                "avg_packet_loss_pct": round(avg_loss, 2) if avg_loss is not None else None,
-            },
-            "results": results[:10],  # Últimos 10 resultados
+            "aggregated": aggregated,
+            "results": results[:10],
         }
     except Exception as e:
         return {"error": str(e), "test_id": body.test_id, "tool": "thousandeyes_get_test_results"}

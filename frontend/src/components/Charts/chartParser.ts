@@ -7,15 +7,17 @@
 import type {
   MultiMetricData, AvailabilityData,
   ResponseTimeData, PacketLossData,
+  NetworkLatencyData,
   TestSummaryItem, TimeSeriesPoint,
 } from './NocCharts'
 
 export type ChartBlock =
-  | { type: 'multi_metric';   data: MultiMetricData }
-  | { type: 'availability';   data: AvailabilityData }
-  | { type: 'response_time';  data: ResponseTimeData }
-  | { type: 'packet_loss';    data: PacketLossData }
-  | { type: 'availability_summary'; data: { tests: TestSummaryItem[]; threshold: number } }
+  | { type: 'multi_metric';          data: MultiMetricData }
+  | { type: 'availability';          data: AvailabilityData }
+  | { type: 'response_time';         data: ResponseTimeData }
+  | { type: 'packet_loss';           data: PacketLossData }
+  | { type: 'network_latency';       data: NetworkLatencyData }
+  | { type: 'availability_summary';  data: { tests: TestSummaryItem[]; threshold: number } }
 
 export interface ParsedMessage {
   textParts: string[]    // markdown text segments between charts
@@ -89,6 +91,9 @@ function parseChartBlock(data: any): ChartBlock | null {
       return { type: 'response_time', data: buildResponseTime(data) }
     case 'packet_loss':
       return { type: 'packet_loss', data: buildPacketLoss(data) }
+    case 'network_latency':
+    case 'latency_simulation':   // alias — agente às vezes usa este nome
+      return { type: 'network_latency', data: buildNetworkLatency(data) }
     case 'availability_summary':
       return {
         type: 'availability_summary',
@@ -103,6 +108,25 @@ function parseChartBlock(data: any): ChartBlock | null {
 }
 
 // ─── Builders ─────────────────────────────────────────────────────────────────
+
+function buildNetworkLatency(d: any): NetworkLatencyData {
+  // Support multiple input shapes from ThousandEyes agent-to-server results
+  const points = toPoints(d.points ?? d.results ?? d.avgLatency_series ?? [])
+  const avg = d.avg ?? d.aggregated?.avg_latency_ms ?? d.expected_metrics?.avg_latency_ms
+    ?? (points.length ? points.reduce((s, p) => s + p.value, 0) / points.length : 0)
+
+  return {
+    testName: d.testName ?? '',
+    window: d.window ?? '1h',
+    points,
+    minPoints: d.minPoints ? toPoints(d.minPoints) : undefined,
+    maxPoints: d.maxPoints ? toPoints(d.maxPoints) : undefined,
+    avg: typeof avg === 'string' ? parseFloat(avg) : (avg ?? 0),
+    min: d.min ?? d.aggregated?.min_latency_ms,
+    max: d.max ?? d.aggregated?.max_latency_ms,
+    jitter: d.jitter ?? d.aggregated?.avg_jitter_ms,
+  }
+}
 
 function toPoints(arr: any[]): TimeSeriesPoint[] {
   if (!Array.isArray(arr)) return []
