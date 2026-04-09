@@ -223,10 +223,13 @@ class AgentOrchestrator:
 
                 log.info("orchestrator.tool_call", tool=tc["name"], input=tc["input"])
                 result = await self.mcp_dispatcher.call(tc["name"], tc["input"])
+                has_error = isinstance(result, dict) and "error" in result
                 log.info("orchestrator.tool_result",
                     tool=tc["name"],
-                    has_error="error" in result if isinstance(result, dict) else False,
-                    result_keys=list(result.keys()) if isinstance(result, dict) else type(result).__name__,
+                    has_error=has_error,
+                    error_detail=result.get("error") if has_error else None,
+                    error_type=result.get("error_type") if has_error else None,
+                    result_preview=str(result)[:200] if not has_error else None,
                 )
 
                 if noc_tool:

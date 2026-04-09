@@ -181,7 +181,10 @@ async def get_active_monitors(body: GetMonitorsInput):
         return {"count": len(result), "monitors": result, "mode": "real"}
 
     except Exception as e:
-        return {"error": str(e), "mode": "real", "tool": "datadog_get_active_monitors"}
+        import traceback
+        tb = traceback.format_exc()
+        log.error(f"datadog_get_active_monitors error: {e}\n{tb}")
+        return {"error": str(e), "error_type": type(e).__name__, "mode": "real", "tool": "datadog_get_active_monitors"}
 
 
 # ─── Tool: get_metrics ───────────────────────────────────────────────────────
