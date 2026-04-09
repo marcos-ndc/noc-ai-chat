@@ -36,10 +36,11 @@ services:
       mcp-thousandeyes:
         condition: service_started
     environment:
+      # Todos os MCP servers escutam na porta 8001 internamente (rede Docker)
       - MCP_ZABBIX_URL=http://mcp-zabbix:8001
-      - MCP_DATADOG_URL=http://mcp-datadog:8002
-      - MCP_GRAFANA_URL=http://mcp-grafana:8003
-      - MCP_THOUSANDEYES_URL=http://mcp-thousandeyes:8004
+      - MCP_DATADOG_URL=http://mcp-datadog:8001
+      - MCP_GRAFANA_URL=http://mcp-grafana:8001
+      - MCP_THOUSANDEYES_URL=http://mcp-thousandeyes:8001
 
   mcp-zabbix:
     build:
