@@ -1,41 +1,65 @@
 # Tasks: Backend API
-**Branch:** `feature/backend-api`
-**Data:** 2026-04-07
+**Versão:** 2.0 | **Data:** 2026-04-09 | **Branch:** `main` (mergeado)
 
 ---
 
-## Phase 0 — Setup
+## Phase 0 — Setup ✅
 
-- [ ] **T101** [S] Configurar projeto Python: pyproject.toml, requirements, estrutura app/
-- [ ] **T102** [S] Definir modelos Pydantic centrais (User, Message, WSEvent, AuthRequest)
-- [ ] **T103** [S] Configurar settings via Pydantic BaseSettings
+- [x] **T101** Configurar projeto Python: requirements.txt, estrutura app/
+- [x] **T102** Definir modelos Pydantic centrais (User, ChatMessage, WSEvent, ToolName, SessionData)
+- [x] **T103** Configurar Settings via Pydantic BaseSettings (lê `.env` e `../.env`)
 
-## Phase 1 — Testes (RED first)
+## Phase 1 — Testes ✅
 
-- [ ] **T104** [P] Testes AuthService (login, JWT encode/decode, expiração)
-- [ ] **T105** [P] Testes SessionManager (save, load, append, TTL)
-- [ ] **T106** [P] Testes AgentOrchestrator (system prompt, histórico, streaming mock)
-- [ ] **T107** [P] Testes health endpoint
+- [x] **T104** Testes AuthService (login, JWT encode/decode, expiração, bcrypt)
+- [x] **T105** Testes SessionManager (save, load, append, trim, TTL)
+- [x] **T106** Testes AgentOrchestrator (system prompt, histórico, streaming mock)
+- [x] **T107** Testes health endpoint
 
-## Phase 2 — Implementação Core
+**Resultado:** 39 testes passando
 
-- [ ] **T108** [S] AuthService + POST /auth/login — T104 GREEN
-- [ ] **T109** [S] SessionManager Redis — T105 GREEN
-- [ ] **T110** [S] System prompt NOC por perfil de usuário
-- [ ] **T111** [S] AgentOrchestrator Claude API + streaming — T106 GREEN
-- [ ] **T112** [S] WebSocket handler /ws/chat com auth guard
-- [ ] **T113** [S] GET /health com checks Redis + MCP
+## Phase 2 — Implementação Core ✅
 
-## Phase 3 — MCP Servers
+- [x] **T108** AuthService + POST /auth/login (bcrypt direto, sem passlib)
+- [x] **T109** SessionManager Redis — TTL 24h, max 50 turnos, role mapping correto
+- [x] **T110** System prompt NOC por perfil + instruções de gráficos chart JSON
+- [x] **T111** AgentOrchestrator — **AsyncAnthropic** + loop agêntico + streaming real
+- [x] **T112** WebSocket handler /ws/chat com auth guard, ConnectionManager
+- [x] **T113** GET /health com checks Redis + MCP servers
+- [x] **T113b** GET /debug/config com chaves mascaradas para diagnóstico
 
-- [ ] **T114** [S] MCP Zabbix (get_active_alerts, get_host_status, get_trigger_history)
-- [ ] **T115** [S] MCP Datadog (get_active_monitors, get_metrics, get_incidents)
-- [ ] **T116** [S] MCP Grafana (get_firing_alerts, get_alert_rules)
-- [ ] **T117** [S] MCP ThousandEyes (get_active_alerts, get_test_results)
+## Phase 3 — MCP Servers ✅
 
-## Phase 4 — Docker e Validação
+- [x] **T114** MCP Zabbix — 8 tools com suporte multi-cliente (tag Organization)
+- [x] **T115** MCP Datadog — 5 tools, health cacheado, debug/monitors
+- [x] **T116** MCP Grafana — 2 tools
+- [x] **T117** MCP ThousandEyes — 6 tools, API v7, endpoints corretos por tipo
 
-- [ ] **T118** [S] Dockerfile backend multi-stage
-- [ ] **T119** [S] Dockerfiles MCP servers
-- [ ] **T120** [S] Testes integração WebSocket end-to-end
-- [ ] **T121** [S] Validação docker-compose up stack completo
+## Phase 4 — Docker e Validação ✅
+
+- [x] **T118** Dockerfile backend (multi-stage)
+- [x] **T119** Dockerfiles MCP servers
+- [x] **T120** docker-compose.yml + docker-compose.dev.yml com hot-reload
+- [x] **T121** Validação stack completo funcionando
+
+## Phase 5 — Bugfixes (Code Review) ✅
+
+- [x] **T122** CR-2: Migrar para AsyncAnthropic (síncrono bloqueava event loop)
+- [x] **T123** CR-3: Streaming real via `messages.stream()` (fake chunking removido)
+- [x] **T124** CR-5: Role mapping `agent → assistant` corrigido
+- [x] **T125** AL-2: `datetime.utcnow()` → `datetime.now(timezone.utc)`
+- [x] **T126** AL-3: MCP URLs com porta correta (8001 interna, não 8002/8003/8004)
+- [x] **T127** Fix: ANTHROPIC_API_KEY passada explicitamente no docker-compose
+- [x] **T128** Fix: Startup warning + log mascarado da chave carregada
+- [x] **T129** Fix: Suporte SSL proxy corporativo (`ANTHROPIC_SSL_VERIFY`, `httpx.AsyncClient`)
+- [x] **T130** Fix: Log completo de tool calls (stop_reason, tool_calls, error_detail)
+- [x] **T131** Fix: docker-compose environment com valores reais (não apenas comentários)
+
+## Próximas Tasks (Backlog)
+
+- [ ] **T132** Rate limiting por usuário (FastAPI middleware)
+- [ ] **T133** SSO/AD corporativo → v2
+- [ ] **T134** Write operations MCP (silenciar alertas, criar tickets) → v3
+- [ ] **T135** Métricas Prometheus / OpenTelemetry
+- [ ] **T136** Cobertura de testes para MCP servers (além de mock)
+- [ ] **T137** Paginação avançada nos resultados das tools
