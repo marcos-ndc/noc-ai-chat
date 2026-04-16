@@ -1,0 +1,363 @@
+{
+  "_meta": {
+    "projeto": "NOC AI Chat",
+    "versao": "1.0",
+    "data_baseline": "2026-04-09",
+    "descricao": "Métricas de sucesso para avaliação do projeto em produção. Revisão mensal recomendada.",
+    "responsavel": "NOC Lead / Engineering Manager"
+  },
+
+  "categorias": {
+
+    "disponibilidade_e_confiabilidade": {
+      "descricao": "O sistema está no ar e se comporta de forma estável",
+      "metricas": [
+        {
+          "id": "DC-01",
+          "nome": "Uptime do stack completo",
+          "meta": "99.5%",
+          "critico_abaixo_de": "99.0%",
+          "medicao": "Porcentagem de tempo em que todos os containers (backend, frontend, MCP servers, Redis) estão healthy",
+          "frequencia": "diaria",
+          "ferramenta_sugerida": "Docker healthcheck + Zabbix/Datadog monitor no endpoint /health"
+        },
+        {
+          "id": "DC-02",
+          "nome": "Taxa de sucesso das conexões WebSocket",
+          "meta": "98%",
+          "critico_abaixo_de": "95%",
+          "medicao": "ws.connected / (ws.connected + ws.failed) nas últimas 24h",
+          "frequencia": "diaria",
+          "fonte": "log ws.connected / ws.disconnected"
+        },
+        {
+          "id": "DC-03",
+          "nome": "Taxa de erro do agente (ws.agent_error)",
+          "meta": "< 1%",
+          "critico_acima_de": "5%",
+          "medicao": "ws.agent_error / ws.message_received nas últimas 24h",
+          "frequencia": "diaria",
+          "fonte": "structlog backend"
+        },
+        {
+          "id": "DC-04",
+          "nome": "Disponibilidade dos MCP servers",
+          "meta": "100% em horário comercial",
+          "critico_abaixo_de": "95%",
+          "medicao": "Resposta 200 no endpoint /health de cada MCP server (Zabbix, Datadog, Grafana, ThousandEyes)",
+          "frequencia": "por_hora",
+          "containers": ["mcp-zabbix", "mcp-datadog", "mcp-grafana", "mcp-thousandeyes"]
+        }
+      ]
+    },
+
+    "performance": {
+      "descricao": "O sistema responde dentro de tempos aceitáveis para operação NOC",
+      "metricas": [
+        {
+          "id": "PF-01",
+          "nome": "Tempo até primeiro token (TTFT)",
+          "meta": "< 3s",
+          "critico_acima_de": "8s",
+          "medicao": "Tempo entre ws.message_received e primeiro agent_token emitido",
+          "frequencia": "por_mensagem",
+          "fonte": "log orchestrator.iteration",
+          "contexto": "Inclui tempo de chamada à API Anthropic e possíveis tool calls"
+        },
+        {
+          "id": "PF-02",
+          "nome": "Latência de tool call MCP",
+          "meta": "< 2s por ferramenta",
+          "critico_acima_de": "5s",
+          "medicao": "Tempo entre orchestrator.tool_call e orchestrator.tool_result",
+          "frequencia": "por_tool_call",
+          "por_ferramenta": {
+            "zabbix": "< 2s",
+            "datadog": "< 2s",
+            "grafana": "< 1s",
+            "thousandeyes": "< 3s"
+          }
+        },
+        {
+          "id": "PF-03",
+          "nome": "Tempo total de resposta (pergunta → agent_done)",
+          "meta": "< 15s para perguntas com ferramentas",
+          "meta_sem_ferramentas": "< 8s",
+          "critico_acima_de": "30s",
+          "medicao": "Diferença entre ws.message_received e ws.agent_done",
+          "frequencia": "por_mensagem"
+        },
+        {
+          "id": "PF-04",
+          "nome": "Bundle size frontend (gzipped)",
+          "meta": "< 300KB",
+          "critico_acima_de": "500KB",
+          "medicao": "Tamanho do arquivo index-*.js após vite build",
+          "frequencia": "por_deploy",
+          "baseline_atual": "109KB gzipped"
+        },
+        {
+          "id": "PF-05",
+          "nome": "First Contentful Paint (FCP)",
+          "meta": "< 2s",
+          "critico_acima_de": "4s",
+          "medicao": "Lighthouse audit na rota /login",
+          "frequencia": "por_deploy"
+        }
+      ]
+    },
+
+    "qualidade_das_respostas": {
+      "descricao": "O agente responde corretamente usando as ferramentas disponíveis",
+      "metricas": [
+        {
+          "id": "QR-01",
+          "nome": "Taxa de uso de ferramentas (tool use rate)",
+          "meta": "> 80%",
+          "descricao": "Percentual de perguntas sobre ambiente/incidentes onde Claude chamou ao menos uma tool MCP",
+          "critico_abaixo_de": "60%",
+          "medicao": "Mensagens com tool_calls.length > 0 / total mensagens sobre ambiente",
+          "frequencia": "semanal",
+          "fonte": "log orchestrator.iteration stop_reason=tool_use"
+        },
+        {
+          "id": "QR-02",
+          "nome": "Taxa de sucesso das tool calls",
+          "meta": "> 95%",
+          "critico_abaixo_de": "85%",
+          "medicao": "tool_results com has_error=false / total tool_calls",
+          "frequencia": "diaria",
+          "fonte": "log orchestrator.tool_result"
+        },
+        {
+          "id": "QR-03",
+          "nome": "Cobertura de ferramentas utilizadas",
+          "meta": "Todas as 4 ferramentas usadas ao menos 1x por dia em produção",
+          "medicao": "Distinct tools nas tool_calls das últimas 24h",
+          "frequencia": "diaria",
+          "ferramentas": ["zabbix", "datadog", "grafana", "thousandeyes"]
+        },
+        {
+          "id": "QR-04",
+          "nome": "Taxa de erros de autenticação MCP",
+          "meta": "0 erros 401/403 por dia",
+          "critico_acima_de": "3 erros por dia",
+          "medicao": "tool_result.error_type in [401, 403, AuthError]",
+          "frequencia": "diaria"
+        }
+      ]
+    },
+
+    "experiencia_do_usuario": {
+      "descricao": "Analistas NOC conseguem usar o sistema com eficiência",
+      "metricas": [
+        {
+          "id": "UX-01",
+          "nome": "Sessões ativas por dia",
+          "meta_inicial": "> 5 sessões/dia (primeiros 30 dias)",
+          "meta_steady_state": "> 20 sessões/dia (após 90 dias)",
+          "medicao": "Distinct session_ids nos logs ws.connected por dia",
+          "frequencia": "diaria"
+        },
+        {
+          "id": "UX-02",
+          "nome": "Mensagens por sessão",
+          "meta": "> 3 mensagens por sessão",
+          "descricao": "Sessões curtas (1-2 mensagens) podem indicar respostas insatisfatórias",
+          "medicao": "ws.message_received agrupados por session_id",
+          "frequencia": "semanal"
+        },
+        {
+          "id": "UX-03",
+          "nome": "Adoção por perfil",
+          "meta": "Todos os 4 perfis usando ao menos 1x por semana",
+          "perfis": ["N1", "N2", "engineer", "manager"],
+          "medicao": "Distinct user_profile nos logs de sessão",
+          "frequencia": "semanal"
+        },
+        {
+          "id": "UX-04",
+          "nome": "Taxa de reconexão WebSocket (retries)",
+          "meta": "< 5% das sessões com retry",
+          "critico_acima_de": "15%",
+          "medicao": "Sessões com retriesRef > 0 / total sessões",
+          "frequencia": "diaria"
+        }
+      ]
+    },
+
+    "integracao_ferramentas_noc": {
+      "descricao": "As integrações com Zabbix, Datadog, Grafana e ThousandEyes estão trazendo dados reais",
+      "metricas": [
+        {
+          "id": "IT-01",
+          "nome": "Zabbix — hosts monitorados via tag Organization",
+          "meta": "100% dos clientes com tag Organization configurada",
+          "medicao": "hosts_without_org_tag = 0 no retorno de zabbix_list_organizations",
+          "frequencia": "semanal"
+        },
+        {
+          "id": "IT-02",
+          "nome": "Datadog — monitors acessíveis",
+          "meta": "> 0 monitors retornados por datadog_get_active_monitors",
+          "medicao": "count no retorno da tool em modo real",
+          "frequencia": "diaria"
+        },
+        {
+          "id": "IT-03",
+          "nome": "ThousandEyes — testes ativos",
+          "meta": "> 0 testes retornados por thousandeyes_list_tests",
+          "medicao": "count no retorno da tool em modo real",
+          "frequencia": "diaria"
+        },
+        {
+          "id": "IT-04",
+          "nome": "MCP servers em modo REAL (não mock)",
+          "meta": "4/4 MCP servers em modo real em produção",
+          "medicao": "mode=real no /health de cada MCP server",
+          "frequencia": "por_deploy",
+          "endpoint": "GET http://localhost:{porta}/health"
+        }
+      ]
+    },
+
+    "seguranca_e_conformidade": {
+      "descricao": "O sistema opera com segurança adequada para ambiente corporativo",
+      "metricas": [
+        {
+          "id": "SC-01",
+          "nome": "Zero secrets expostos no frontend",
+          "meta": "0 ocorrências de API keys no bundle JS",
+          "medicao": "grep por padrões de API key no dist/assets/*.js após build",
+          "frequencia": "por_deploy",
+          "comando": "grep -r 'sk-ant\\|DD-API\\|ZABBIX' frontend/dist/ | wc -l"
+        },
+        {
+          "id": "SC-02",
+          "nome": "JWT em memória (não localStorage)",
+          "meta": "0 tokens em localStorage/sessionStorage",
+          "medicao": "Inspeção de código — token armazenado apenas em Zustand store",
+          "frequencia": "por_code_review"
+        },
+        {
+          "id": "SC-03",
+          "nome": "Tentativas de login com falha",
+          "meta": "< 10 falhas por usuário por hora",
+          "critico_acima_de": "50 falhas/hora (possível brute force)",
+          "medicao": "POST /auth/login com status 401 agrupado por IP",
+          "frequencia": "por_hora"
+        },
+        {
+          "id": "SC-04",
+          "nome": "ANTHROPIC_SSL_VERIFY em produção",
+          "meta": "false apenas em ambientes com proxy corporativo documentado",
+          "descricao": "Manter registro de quais ambientes usam SSL_VERIFY=false e por quê",
+          "frequencia": "por_deploy"
+        }
+      ]
+    },
+
+    "qualidade_de_codigo": {
+      "descricao": "O codebase mantém padrões de qualidade para manutenibilidade",
+      "metricas": [
+        {
+          "id": "QC-01",
+          "nome": "Erros TypeScript",
+          "meta": "0 erros em tsc --noEmit",
+          "critico_acima_de": "1",
+          "medicao": "tsc --noEmit | grep -c 'error TS'",
+          "frequencia": "por_commit"
+        },
+        {
+          "id": "QC-02",
+          "nome": "Cobertura de testes backend",
+          "meta": "> 70% de cobertura nas rotas e serviços críticos",
+          "critico_abaixo_de": "50%",
+          "medicao": "pytest --cov=app --cov-report=term-missing",
+          "frequencia": "por_sprint",
+          "baseline_atual": "39 testes passando"
+        },
+        {
+          "id": "QC-03",
+          "nome": "Erros de sintaxe Python (MCP servers)",
+          "meta": "0 erros em py_compile",
+          "medicao": "python3 -m py_compile mcp-servers/**/*.py",
+          "frequencia": "por_commit"
+        },
+        {
+          "id": "QC-04",
+          "nome": "Idade média dos bugs abertos",
+          "meta": "P1: < 1 dia | P2: < 3 dias | P3: < 2 semanas",
+          "medicao": "Issues abertas no GitHub por label de prioridade",
+          "frequencia": "semanal"
+        }
+      ]
+    },
+
+    "valor_de_negocio": {
+      "descricao": "O projeto entrega valor mensurável para as operações NOC",
+      "metricas": [
+        {
+          "id": "VN-01",
+          "nome": "Redução de MTTR (Mean Time To Resolve)",
+          "meta": "Redução de 20% no MTTR em 90 dias",
+          "medicao": "Comparação com baseline pré-implantação do NOC AI Chat",
+          "frequencia": "mensal",
+          "observacao": "Requer coleta de baseline antes do go-live"
+        },
+        {
+          "id": "VN-02",
+          "nome": "Incidentes identificados proativamente pelo agente",
+          "meta": "> 10% dos incidentes identificados via NOC AI Chat antes de escalonamento manual",
+          "medicao": "Contagem de alertas onde o agente reportou antes de ticket humano",
+          "frequencia": "mensal"
+        },
+        {
+          "id": "VN-03",
+          "nome": "Satisfação dos analistas (NPS interno)",
+          "meta": "NPS > 30 (pesquisa trimestral)",
+          "medicao": "Pesquisa qualitativa com time NOC",
+          "frequencia": "trimestral",
+          "escala": "0-10 — Quanto você recomendaria o NOC AI Chat para um colega?"
+        },
+        {
+          "id": "VN-04",
+          "nome": "Cobertura de clientes monitorados",
+          "meta": "100% dos clientes com tag Organization consultáveis via chat",
+          "medicao": "clients_in_zabbix = clients_queryable_via_chat",
+          "frequencia": "mensal"
+        }
+      ]
+    }
+
+  },
+
+  "roadmap_metricas": {
+    "fase_1_primeiros_30_dias": {
+      "foco": "Estabilidade e adoção inicial",
+      "metricas_chave": ["DC-01", "DC-02", "DC-03", "QR-01", "UX-01", "IT-04"],
+      "criterio_sucesso": "Stack rodando sem downtime não planejado, analistas usando diariamente"
+    },
+    "fase_2_30_90_dias": {
+      "foco": "Qualidade das respostas e cobertura de ferramentas",
+      "metricas_chave": ["QR-01", "QR-02", "QR-03", "PF-01", "PF-02", "IT-01", "IT-02", "IT-03"],
+      "criterio_sucesso": "Agente usando todas as 4 ferramentas, TTFT < 3s consistentemente"
+    },
+    "fase_3_apos_90_dias": {
+      "foco": "Valor de negócio e expansão",
+      "metricas_chave": ["VN-01", "VN-02", "VN-03", "VN-04"],
+      "criterio_sucesso": "MTTR reduzido, NPS positivo, 100% dos clientes cobertos"
+    }
+  },
+
+  "alertas_criticos": {
+    "descricao": "Se qualquer uma destas condições for detectada, acionar responsável imediatamente",
+    "condicoes": [
+      "DC-03 > 5% (muitos erros do agente)",
+      "DC-04 < 95% (MCP server fora do ar)",
+      "QR-02 < 85% (ferramentas falhando consistentemente)",
+      "SC-01 > 0 (secret exposto no bundle)",
+      "SC-03 > 50 falhas/hora por IP (possível ataque)"
+    ]
+  }
+}
