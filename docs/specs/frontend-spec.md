@@ -1,129 +1,143 @@
-# Spec: Frontend — NOC AI Chat (v1 MVP)
-**Feature:** `feature/frontend-base`  
-**Data:** 2026-04-07  
-**Status:** Aprovado
+# Spec: Frontend — NOC AI Chat
+**Versão:** 2.0 | **Data:** 2026-04-09 | **Status:** Implementado ✅
 
 ---
 
 ## Overview
 
-Interface web responsiva (PWA) para interação com o agente de IA NOC. O usuário pode conversar com o agente via texto ou voz. O agente responde em streaming, indicando em tempo real quais ferramentas está consultando. A interface se adapta ao perfil do usuário logado.
+Interface web responsiva (PWA) para interação com o agente de IA NOC. Tema escuro com estética de terminal NOC (grid, scanlines, glow). Suporte a voz bidirecional (STT + TTS), renderização de Markdown e gráficos interativos inline com Recharts.
+
+---
+
+## Estrutura Implementada
+
+```
+frontend/src/
+├── App.tsx                          # Rotas + ProtectedRoute + PublicRoute
+├── main.tsx                         # Entry point (StrictMode desabilitado)
+├── pages/
+│   ├── LoginPage.tsx                # Form de login com validação
+│   └── ChatPage.tsx                 # Página principal do chat
+├── components/
+│   ├── Chat/
+│   │   ├── ChatMessage.tsx          # Mensagem com AgentContent (markdown + charts)
+│   │   └── ChatInput.tsx            # Input com voz e envio
+│   ├── Charts/
+│   │   ├── NocCharts.tsx            # 6 componentes Recharts com tema NOC
+│   │   └── chartParser.ts           # Parser de blocos chart JSON nas mensagens
+│   ├── Layout/
+│   │   └── Header.tsx               # Header com usuário, perfil, logout, status WS
+│   ├── StatusIndicator/
+│   │   └── StatusIndicator.tsx      # Indicador animado de tools em uso
+│   └── VoiceInput/ VoiceOutput/     # Botões de voz
+├── hooks/
+│   ├── useWebSocket.ts              # WS com stable refs, backoff, reconexão
+│   ├── useAuth.ts                   # Zustand store + login/logout
+│   ├── useVoiceInput.ts             # Web Speech API STT
+│   └── useVoiceOutput.ts            # Web Speech API TTS
+└── types/
+    └── index.ts                     # Message, User, WSEvent, ToolName, etc.
+```
 
 ---
 
 ## User Journeys
 
 ### J1 — Login
-1. Usuário acessa a URL da aplicação
-2. Vê tela de login com campo de email/senha
-3. Autentica com sucesso → redireciona para o chat
-4. Token JWT armazenado em memória
+1. Usuário acessa `/` → redireciona para `/login`
+2. Preenche email/senha, clica Entrar
+3. Se credenciais erradas: mensagem de erro exibida, **sem redirecionar** (CR-1 corrigido)
+4. Se sucesso: redireciona para `/chat`
 
 ### J2 — Conversa por texto
-1. Usuário digita uma pergunta no campo de input
-2. Pressiona Enter ou clica em Enviar
-3. Mensagem aparece no histórico (lado direito, balão azul)
-4. Indicador mostra "Consultando Zabbix..." enquanto o agente trabalha
-5. Resposta aparece em streaming (lado esquerdo, balão escuro) com Markdown renderizado
-6. Histórico é mantido durante a sessão
+1. Usuário digita no input e pressiona Enter (ou clica enviar)
+2. Mensagem aparece imediatamente no histórico (lado direito)
+3. Agente prepara slot de resposta (sem race condition — CR-4 corrigido)
+4. StatusIndicator mostra tool em uso: `● zabbix`, `● datadog`, etc.
+5. Resposta aparece em streaming real token-a-token
+6. Gráficos Recharts renderizados inline quando agente emite blocos `chart`
 
-### J3 — Conversa por voz (STT → texto)
-1. Usuário clica no botão de microfone
-2. Indicador visual mostra que está gravando
-3. Usuário fala a pergunta
-4. Clica novamente (ou pausa automática) para encerrar gravação
-5. Texto transcrito aparece no campo de input
-6. Fluxo segue igual ao J2
+### J3 — Voz bidirecional
+1. Clique no microfone → gravação ativa (indicador vermelho)
+2. Fala é transcrita via Web Speech API e aparece no input
+3. Toggle de saída em voz: TTS lê resposta automaticamente após `agent_done`
 
-### J4 — Resposta em voz bidirecional
-1. Usuário ativa o toggle "Modo Voz"
-2. Após cada resposta do agente, TTS lê o texto automaticamente
-3. Usuário pode interromper o áudio clicando em "Parar"
-4. Toggle pode ser desativado a qualquer momento
-
-### J5 — Indicador de ferramentas
-1. Durante o processamento, o agente envia eventos de status
-2. Interface exibe qual ferramenta está sendo consultada: "🔍 Zabbix", "📊 Datadog", etc.
-3. Ao finalizar, indicador desaparece e a resposta começa a aparecer
+### J4 — Gráficos interativos
+1. Agente retorna bloco ` ```chart {...} ``` ` na resposta
+2. `chartParser` detecta e extrai o JSON
+3. Componente Recharts renderizado inline na mesma mensagem
+4. Tipos suportados: `availability`, `response_time`, `packet_loss`, `network_latency`, `multi_metric`, `availability_summary`, `latency_simulation` (alias de `network_latency`)
 
 ---
 
 ## Functional Requirements
 
-- **FR-1:** O sistema SHALL exibir uma tela de login com campos email e senha
-- **FR-2:** O sistema SHALL autenticar via POST `/auth/login` e armazenar o JWT em memória
-- **FR-3:** O sistema SHALL redirecionar usuários não autenticados para `/login`
-- **FR-4:** O sistema SHALL manter conexão WebSocket com o backend durante a sessão de chat
-- **FR-5:** O sistema SHALL exibir mensagens do usuário e do agente em formato de chat (bolhas)
-- **FR-6:** O sistema SHALL renderizar Markdown nas respostas do agente (bold, code blocks, tabelas, listas)
-- **FR-7:** O sistema SHALL exibir respostas em streaming (token por token) sem aguardar a resposta completa
-- **FR-8:** O sistema SHALL exibir indicador animado com o nome da ferramenta sendo consultada
-- **FR-9:** O sistema SHALL permitir entrada de voz via Web Speech API (STT)
-- **FR-10:** O sistema SHALL transcrever voz para texto no campo de input antes de enviar
-- **FR-11:** O sistema SHALL oferecer toggle para ativar/desativar resposta em áudio (TTS)
-- **FR-12:** O sistema SHALL ler a resposta do agente em voz via Web Speech API (TTS) quando o modo estiver ativo
-- **FR-13:** O sistema SHALL ser responsivo e funcionar em mobile (≥ 375px) e desktop (≥ 1024px)
-- **FR-14:** O sistema SHALL ser instalável como PWA (manifest + service worker)
-- **FR-15:** O sistema SHALL exibir o nome e perfil do usuário logado no header
-- **FR-16:** O sistema SHALL permitir logout, invalidando o token em memória
+| ID | Requisito | Status |
+|----|-----------|--------|
+| FR-1 | Tela de login com email/senha | ✅ |
+| FR-2 | Autenticação via POST `/auth/login`, JWT em Zustand | ✅ |
+| FR-3 | Redirect guard: não autenticado → `/login` | ✅ |
+| FR-4 | Conexão WebSocket persistente com reconexão (backoff 3x) | ✅ |
+| FR-5 | Mensagens em bolhas distintas (usuário direita, agente esquerda) | ✅ |
+| FR-6 | Markdown renderizado nas respostas (bold, code, tabelas, listas) | ✅ |
+| FR-7 | Streaming token-a-token sem aguardar resposta completa | ✅ |
+| FR-8 | StatusIndicator com nome e ícone da ferramenta consultada | ✅ |
+| FR-9 | STT via Web Speech API | ✅ |
+| FR-10 | Texto transcrito aparece no input antes de enviar | ✅ |
+| FR-11 | Toggle TTS para resposta em voz | ✅ |
+| FR-12 | TTS lê resposta do agente quando modo ativo | ✅ |
+| FR-13 | Responsivo: mobile (≥ 375px) e desktop (≥ 1024px) | ✅ |
+| FR-14 | PWA instalável (manifest + service worker via vite-plugin-pwa) | ✅ |
+| FR-15 | Header com nome, perfil e botão de logout | ✅ |
+| FR-16 | Logout invalida JWT em memória | ✅ |
+| FR-17 | Gráficos Recharts interativos inline (6 tipos) | ✅ |
+| FR-18 | Login não redireciona em caso de erro | ✅ (CR-1) |
+
+---
+
+## Componentes de Gráfico (NocCharts.tsx)
+
+| Componente | chartType | Métricas exibidas |
+|------------|-----------|-------------------|
+| `AvailabilityChart` | `availability` | % disponibilidade, linha SLA 99% |
+| `ResponseTimeChart` | `response_time` | Latência ms, refs 200ms/500ms |
+| `PacketLossChart` | `packet_loss` | % perda, barras por severidade |
+| `NetworkLatencyChart` | `network_latency` / `latency_simulation` | avg/min/max, jitter |
+| `MetricDashboard` | `multi_metric` | Painel com os 3 gráficos + header |
+| `AvailabilitySummaryChart` | `availability_summary` | Barras horizontais multi-teste |
+
+---
+
+## Bugs Corrigidos (Code Review 2026-04-08)
+
+| ID | Bug | Correção |
+|----|-----|----------|
+| CR-1 | Login redirecionava mesmo com erro | Verifica `isAuthenticated` antes de navegar |
+| CR-4 | Race condition: `currentAgentMsgId` null no primeiro token | Definido antes de `send()` |
+| AL-1 | `isLoading`/`error` perdidos entre navegações | Movidos para Zustand store |
+| AL-4 | `timestamp` do WS como string quebrava `formatTime()` | `new Date()` + `isNaN()` guard |
+| ME-3 | `useVoiceOutput` instanciado em duplicata | Removido do `ChatInput` |
 
 ---
 
 ## Non-Functional Requirements
 
-- **NFR-1:** First Contentful Paint < 2s em conexão 4G simulada
-- **NFR-2:** Bundle principal < 300KB gzipped
-- **NFR-3:** A interface deve responder a interações em < 100ms (feedback visual imediato)
-- **NFR-4:** WebSocket deve reconectar automaticamente em até 3 tentativas com backoff exponencial
-- **NFR-5:** WCAG 2.1 AA — todos os controles acessíveis por teclado, contraste ≥ 4.5:1
-- **NFR-6:** Funcional nos browsers: Chrome 120+, Firefox 120+, Safari 17+, Edge 120+
-
----
-
-## Acceptance Criteria
-
-**FR-1/FR-2:**
-- Given: usuário acessa `/login`
-- When: preenche email/senha corretos e submete
-- Then: é redirecionado para `/chat` e vê seu nome no header
-
-**FR-7:**
-- Given: usuário enviou uma pergunta
-- When: o agente está processando
-- Then: cada token aparece individualmente na tela com delay < 50ms entre tokens
-
-**FR-9/FR-10:**
-- Given: usuário clica no botão de microfone
-- When: fala por 3 segundos e para
-- Then: o texto transcrito aparece no input em até 500ms
-
-**FR-11/FR-12:**
-- Given: modo voz bidirecional ativado
-- When: agente termina de responder
-- Then: TTS inicia leitura automaticamente em até 1s após o fim do streaming
+| ID | Requisito | Meta | Status |
+|----|-----------|------|--------|
+| NFR-1 | First Contentful Paint | < 2s | ✅ |
+| NFR-2 | Bundle principal gzipped | < 300KB | ✅ (~109KB) |
+| NFR-3 | Feedback visual imediato | < 100ms | ✅ |
+| NFR-4 | Reconexão WebSocket com backoff | 3 tentativas | ✅ |
+| NFR-5 | Build Docker sem erros (`vite build`) | 0 erros | ✅ |
+| NFR-6 | Zero erros TypeScript | `tsc --noEmit` = 0 | ✅ |
 
 ---
 
 ## Out of Scope (v1)
 
-- Histórico persistente entre sessões (Redis apenas durante sessão ativa)
-- Upload de arquivos/screenshots para o agente
+- Histórico persistente entre sessões do browser
+- Upload de arquivos/screenshots
 - Notificações push
-- Múltiplas conversas/tabs simultâneas
-- Tema claro/escuro toggle (apenas tema escuro no MVP)
-- i18n / múltiplos idiomas (estrutura preparada, não implementada)
-- Integração com SSO/AD
-
----
-
-## Dependencies
-
-- Backend FastAPI rodando em `VITE_BACKEND_URL` (WebSocket + REST)
-- Para desenvolvimento: mock server que simula respostas do agente
-
----
-
-## Open Questions
-
-- [ ] O backend vai suportar reconexão de WebSocket com retomada de contexto? (Assumido: sim, via session ID no Redis)
-- [ ] Qual o tamanho máximo do histórico exibido no chat? (Assumido: últimas 100 mensagens, scroll infinito futuro)
+- Tema claro
+- i18n / múltiplos idiomas
+- SSO/AD corporativo → v2

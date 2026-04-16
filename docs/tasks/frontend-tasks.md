@@ -1,112 +1,76 @@
-# Tasks: Frontend MVP
-**Branch:** `feature/frontend-base`  
-**Data:** 2026-04-07
+# Tasks: Frontend
+**Versão:** 2.0 | **Data:** 2026-04-09 | **Branch:** `main` (mergeado)
 
 ---
 
-## Phase 0 — Setup & Contratos
+## Phase 0 — Setup ✅
 
-- [x] **T001** [S] Inicializar repo Git com `main` branch e estrutura de pastas
-  - Critério: `git log` mostra commit inicial; estrutura de dirs conforme spec
-  - Links: CONSTITUTION.md
+- [x] **T001** Inicializar projeto React + TypeScript + Vite + Tailwind
+- [x] **T002** Configurar TypeScript strict mode + paths aliases
+- [x] **T003** Definir tipos TypeScript centrais em `src/types/index.ts`
+  - `Message`, `User`, `WSEvent`, `WSOutboundMessage`, `ToolName`, `TOOL_METADATA`, etc.
+- [x] **T004** Configurar Zustand store (useAuthStore)
 
-- [ ] **T002** [S] Configurar projeto React + TypeScript + Vite + Tailwind
-  - Critério: `npm run dev` sobe sem erros; TypeScript strict mode ativo
-  - Deps: T001
+## Phase 1 — Testes ✅
 
-- [ ] **T003** [S] Definir tipos TypeScript centrais (`src/types/`)
-  - Critério: interfaces `Message`, `User`, `ToolStatus`, `WSEvent` definidas e exportadas
-  - Deps: T002
+- [x] **T005** Testes para `useWebSocket` hook
+- [x] **T006** Testes para `useVoiceInput` hook
+- [x] **T007** Smoke tests para `ChatMessage` component
+- [x] **T008** Smoke tests para `LoginPage`
 
-- [ ] **T004** [S] Configurar mock WebSocket server para desenvolvimento
-  - Critério: frontend conecta ao mock e recebe mensagens simuladas do agente
-  - Deps: T002
+## Phase 2 — Core ✅
 
----
+- [x] **T009** `useWebSocket` — stable refs, backoff exponencial (3x), reconexão
+- [x] **T010** `useAuth` + `LoginPage` — Zustand, JWT em memória, redirect guard
+- [x] **T011** `ChatMessage` — Markdown, balões user/agent, timestamps
+- [x] **T012** `ChatInput` — Enter para enviar, Shift+Enter nova linha, auto-resize
+- [x] **T013** Streaming de respostas token-a-token
+- [x] **T014** `StatusIndicator` — ícone animado da tool em uso
+- [x] **T015** `useVoiceInput` — STT Web Speech API, preview transcript
+- [x] **T016** `useVoiceOutput` — TTS Web Speech API, toggle, stop
+- [x] **T017** `Header` — perfil, status WS, logout
 
-## Phase 1 — Testes (escritos antes da implementação)
+## Phase 3 — Design e PWA ✅
 
-- [ ] **T005** [P] Escrever testes para `useWebSocket` hook
-  - Critério: testes RED para conexão, reconexão, envio e recebimento de mensagens
-  - Deps: T003
+- [x] **T018** Design system NOC: cores, tipografia, grid, scanlines, glow
+- [x] **T019** PWA: manifest, service worker, ícones
+- [x] **T020** Dockerfile frontend (multi-stage + nginx) + Dockerfile.dev
 
-- [ ] **T006** [P] Escrever testes para `useVoiceInput` hook
-  - Critério: testes RED para start/stop gravação, transcrição, tratamento de erro
-  - Deps: T003
+## Phase 4 — Gráficos Interativos ✅
 
-- [ ] **T007** [P] Escrever testes para `ChatMessage` component
-  - Critério: testes RED para renderização de Markdown, balões user/agent, streaming
-  - Deps: T003
+- [x] **T021** Instalar Recharts + react-is (peer dependency obrigatória)
+- [x] **T022** `NocCharts.tsx` — 6 componentes Recharts com tema NOC:
+  - `AvailabilityChart` — área com gradiente, linha SLA
+  - `ResponseTimeChart` — linha com referências 200ms/500ms
+  - `PacketLossChart` — barras coloridas por severidade
+  - `NetworkLatencyChart` — avg/min/max com jitter
+  - `MetricDashboard` — painel completo com 3 gráficos
+  - `AvailabilitySummaryChart` — barras horizontais multi-teste
+- [x] **T023** `chartParser.ts` — parser de blocos chart JSON nas mensagens
+  - Detecta ` ```chart {...} ``` ` no conteúdo
+  - Suporta: `availability`, `response_time`, `packet_loss`, `network_latency`,
+    `multi_metric`, `availability_summary`, `latency_simulation` (alias)
+- [x] **T024** `AgentContent` em `ChatMessage.tsx` — intercala markdown e gráficos
 
-- [ ] **T008** [P] Escrever testes para `LoginPage`
-  - Critério: testes RED para validação de form, submit, redirect após login
-  - Deps: T003
+## Phase 5 — Bugfixes (Code Review) ✅
 
----
+- [x] **T025** CR-1: Login só redireciona quando `isAuthenticated = true`
+- [x] **T026** CR-4: `currentAgentMsgId` definido antes de `send()` (race condition)
+- [x] **T027** AL-1: `isLoading`/`error` movidos para Zustand store
+- [x] **T028** AL-4: `formatTime()` aceita `string | Date`, converte com `new Date()`
+- [x] **T029** ME-3: `useVoiceOutput` removido do `ChatInput` (instância duplicada)
+- [x] **T030** Fix: `StrictMode` desabilitado (causava dupla conexão WS em dev)
+- [x] **T031** Fix: build script = `vite build` (sem `tsc -b` que causava erros de node_modules)
+- [x] **T032** Fix: `@types/node` adicionado para `vite.config.ts`
+- [x] **T033** Fix: `vite.config.ts` refatorado com `loadEnv()` (sem `process.env` inline)
+- [x] **T034** Fix: `react-is` adicionado ao `package.json` (peer dep do Recharts)
 
-## Phase 2 — Implementação Core
+## Próximas Tasks (Backlog)
 
-- [ ] **T009** [S] Implementar `useWebSocket` hook
-  - Critério: T005 passa GREEN; reconexão com backoff exponencial (3 tentativas)
-  - Links: FR-4, NFR-4 | Deps: T005
-
-- [ ] **T010** [S] Implementar `useAuth` hook + `LoginPage`
-  - Critério: T008 passa GREEN; JWT em memória; redirect guard funcionando
-  - Links: FR-1, FR-2, FR-3, FR-16 | Deps: T005
-
-- [ ] **T011** [S] Implementar `ChatMessage` component
-  - Critério: T007 passa GREEN; Markdown renderizado; balões distintos user/agent
-  - Links: FR-5, FR-6 | Deps: T009
-
-- [ ] **T012** [S] Implementar `ChatInput` component
-  - Critério: Enter envia mensagem; botão enviar; campo limpa após envio
-  - Links: FR-5 | Deps: T011
-
-- [ ] **T013** [S] Implementar streaming de respostas
-  - Critério: tokens aparecem individualmente; T007 streaming test GREEN
-  - Links: FR-7 | Deps: T011
-
-- [ ] **T014** [S] Implementar `StatusIndicator` component
-  - Critério: exibe nome da ferramenta com ícone animado; desaparece após resposta
-  - Links: FR-8 | Deps: T011
-
-- [ ] **T015** [S] Implementar `useVoiceInput` hook
-  - Critério: T006 passa GREEN; texto aparece no input após fala
-  - Links: FR-9, FR-10 | Deps: T006, T012
-
-- [ ] **T016** [S] Implementar `useVoiceOutput` hook + toggle
-  - Critério: TTS lê resposta quando modo ativo; toggle funcional
-  - Links: FR-11, FR-12 | Deps: T013
-
-- [ ] **T017** [S] Implementar `Layout` + `Header` component
-  - Critério: nome/perfil do usuário no header; botão logout funcional; responsivo
-  - Links: FR-13, FR-15, FR-16 | Deps: T010
-
----
-
-## Phase 3 — PWA & Design
-
-- [ ] **T018** [S] Aplicar design system (cores, tipografia, tema escuro NOC)
-  - Critério: interface com identidade visual NOC; sem estética genérica
-  - Deps: T017
-
-- [ ] **T019** [S] Configurar PWA (manifest + service worker)
-  - Critério: instalável no Chrome desktop e Safari mobile; ícones configurados
-  - Links: FR-14 | Deps: T018
-
-- [ ] **T020** [S] Configurar Dockerfile do frontend (multi-stage + nginx)
-  - Critério: `docker build` sem erros; imagem < 50MB; healthcheck funcionando
-  - Deps: T018
-
----
-
-## Phase 4 — Validação
-
-- [ ] **T021** [S] Rodar suite completa de testes — todos GREEN
-  - Critério: `npm test` 100% passando; cobertura ≥ 70% em hooks e utils
-
-- [ ] **T022** [S] Lighthouse audit
-  - Critério: Performance ≥ 85, Accessibility ≥ 85, PWA ≥ 85
-
-- [ ] **T023** [S] Revisão humana contra acceptance criteria do spec
-  - Critério: todos os FR-1 a FR-16 verificados manualmente
+- [ ] **T035** Histórico persistente entre sessões (localStorage opt-in)
+- [ ] **T036** Upload de screenshots para análise pelo agente
+- [ ] **T037** Notificações push para alertas P1/P2
+- [ ] **T038** Tema claro (toggle dark/light)
+- [ ] **T039** Exportar conversa como PDF
+- [ ] **T040** Lighthouse audit completo (meta: ≥ 85 em todas as categorias)
+- [ ] **T041** Cobertura de testes ≥ 70% em hooks e utils
