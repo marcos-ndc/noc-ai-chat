@@ -40,7 +40,7 @@ services:
       - CORS_ALLOW_ALL=true
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ANTHROPIC_SSL_VERIFY=${ANTHROPIC_SSL_VERIFY:-true}
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       redis:
         condition: service_healthy
@@ -54,7 +54,7 @@ services:
     env_file: .env
     environment:
       - SSL_VERIFY=${SSL_VERIFY:-false}
-    command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+    command: python -m uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   mcp-datadog:
     build:
@@ -66,7 +66,7 @@ services:
     environment:
       - SSL_VERIFY=${SSL_VERIFY:-false}
       - DATADOG_SSL_VERIFY=${DATADOG_SSL_VERIFY:-false}
-    command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+    command: python -m uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   mcp-grafana:
     build:
@@ -77,7 +77,7 @@ services:
     env_file: .env
     environment:
       - SSL_VERIFY=${SSL_VERIFY:-false}
-    command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+    command: python -m uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   mcp-thousandeyes:
     build:
@@ -88,7 +88,7 @@ services:
     env_file: .env
     environment:
       - SSL_VERIFY=${SSL_VERIFY:-false}
-    command: uvicorn server:app --host 0.0.0.0 --port 8001 --reload
+    command: python -m uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 
   redis:
     image: redis:7-alpine
