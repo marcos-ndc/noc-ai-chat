@@ -152,6 +152,7 @@ export function ChatPage() {
   }, [messages, isAgentTyping])
 
   const handleSend = useCallback((content: string, fromVoice = false) => {
+    // Fix: usar fromVoice diretamente (não voiceMode state — setState é async!)
     setVoiceMode(fromVoice)
     const userMsg: Message = {
       id: generateId(),
@@ -167,7 +168,8 @@ export function ChatPage() {
     setIsAgentTyping(true)
     setMessages(prev => [...prev, userMsg])
 
-    send({ type: 'user_message', content, sessionId, voiceMode })
+    // Usa fromVoice diretamente — voiceMode state ainda não atualizou (React async)
+    send({ type: 'user_message', content, sessionId, voiceMode: fromVoice })
   }, [send, sessionId])
 
   return (
@@ -191,6 +193,7 @@ export function ChatPage() {
         onVoiceSend={(content) => handleSend(content, true)}
         disabled={!isConnected || isAgentTyping}
         voiceOutputState={voiceOutput.state}
+        voiceOutputIsPremium={voiceOutput.isPremium}
         voiceOutputEnabled={voiceOutputEnabled}
         onVoiceOutputToggle={() => {
           if (voiceOutputEnabled) voiceOutput.stop()

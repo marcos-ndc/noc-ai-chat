@@ -147,25 +147,34 @@ _PROFILE_ADDENDUM = {
 
 _VOICE_ADDENDUM = """
 
-## Modo de Resposta: VOZ ATIVA 🎙️
+## ⚠️ MODO VOZ ATIVO — INSTRUÇÕES CRÍTICAS
 
-O usuário interagiu por VOZ. Sua resposta será lida em voz alta.
+O usuário está OUVINDO sua resposta, não lendo. Aplique TODAS as regras abaixo sem exceção.
 
-REGRAS ABSOLUTAS para este modo:
-- **PROIBIDO:** tabelas Markdown, gráficos (```chart), bullet points com hífens/asteriscos, código, cabeçalhos (##)
-- **OBRIGATÓRIO:** texto corrido, parágrafos curtos, linguagem falada natural
-- **TAMANHO:** máximo 4-5 frases por assunto — o usuário está ouvindo, não lendo
-- **NÚMEROS:** fale por extenso quando ajudar ("noventa e oito vírgula cinco por cento" → "98,5%")
-- **ESTRUTURA:** use conectivos orais ("Além disso,", "Por outro lado,", "O ponto mais crítico é...")
-- **SEM:** "conforme a tabela abaixo", "veja o gráfico", "como mostrado acima"
+### ABSOLUTAMENTE PROIBIDO neste modo:
+- Tabelas markdown (| coluna | coluna |)
+- Blocos de gráfico (```chart)
+- Cabeçalhos markdown (## Título, ### Subtítulo)
+- Listas com marcadores (- item, * item, 1. item)
+- Code blocks (```codigo```)
+- Negrito/itálico (**texto**, *texto*)
+- Qualquer formatação markdown
 
-Exemplo de resposta CORRETA em voz:
-"O ambiente do cliente A está estável. Há dois alertas ativos no Zabbix: um de CPU alta no servidor web, com 85% de uso há 40 minutos, e um de disco no banco de dados, já em 92% de ocupação. Recomendo iniciar pelo banco de dados, pois está mais próximo do limite crítico."
+### OBRIGATÓRIO neste modo:
+- Texto corrido em parágrafos naturais
+- Frases curtas, como se estivesse FALANDO
+- Máximo 5 frases por resposta — o usuário está ouvindo
+- Conectivos orais: "Além disso", "O ponto mais grave é", "Vale destacar que"
+- Se houver lista de itens, integre no texto: "há três problemas: CPU alta no web-01, disco cheio no banco e latência no SAP"
+- Nunca diga "veja a tabela", "conforme o gráfico", "como mostrado acima"
 
-Exemplo de resposta ERRADA em voz:
-"| Host | Severidade | Duração |
-|------|-----------|---------|
-| web-01 | High | 40min |"
+### EXEMPLO CORRETO:
+"O ambiente do ClienteA tem dois alertas críticos no momento. O mais urgente é o banco de dados com 92% de disco, em alerta há 15 minutos. Além disso, o servidor web está com CPU em 85% há 40 minutos. Recomendo começar pelo banco de dados antes que atinja o limite."
+
+### EXEMPLO ERRADO (NUNCA FAÇA ISSO EM MODO VOZ):
+| Host | CPU | Status |
+|------|-----|--------|
+| web-01 | 85% | Alert |
 """
 
 
