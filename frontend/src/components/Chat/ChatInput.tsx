@@ -10,6 +10,7 @@ interface ChatInputProps {
   disabled?: boolean
   voiceOutputState?: VoiceOutputState
   voiceOutputEnabled?: boolean
+  voiceOutputIsPremium?: boolean
   onVoiceOutputToggle?: () => void
   onVoiceOutputStop?: () => void
   placeholder?: string
@@ -21,6 +22,7 @@ export function ChatInput({
   disabled = false,
   voiceOutputState = 'idle',
   voiceOutputEnabled = false,
+  voiceOutputIsPremium = false,
   onVoiceOutputToggle,
   onVoiceOutputStop,
   placeholder = 'Pergunte sobre incidentes, alertas, métricas...',
@@ -148,6 +150,7 @@ export function ChatInput({
           enabled={voiceOutputEnabled}
           state={voiceOutputState}
           isSupported={'speechSynthesis' in window}
+          isPremium={voiceOutputIsPremium}
           onToggle={onVoiceOutputToggle ?? (() => {})}
           onStop={onVoiceOutputStop ?? (() => {})}
         />
