@@ -8,6 +8,20 @@ import { useVoiceOutput } from '../hooks/useVoiceOutput'
 import { useAuth, useAuthStore } from '../hooks/useAuth'
 import type { Message, ToolName, WSEvent } from '../types'
 
+/** Remove markdown e blocos chart do texto antes de enviar para TTS */
+function stripForVoice(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, '')   // remove code blocks e chart blocks
+    .replace(/#{1,6}\s/g, '')          // remove headings
+    .replace(/[*_~`|]/g, '')           // remove emphasis, code inline, pipe
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links → só o texto
+    .replace(/^\s*[-•]\s/gm, '')       // remove bullets
+    .replace(/\n{2,}/g, '. ')          // parágrafos duplos viram pausa
+    .replace(/\n/g, ' ')               // quebras simples viram espaço
+    .replace(/\s{2,}/g, ' ')           // múltiplos espaços
+    .trim()
+}
+
 const BACKEND_WS_BASE = (import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000')
   .replace(/^http/, 'ws') + '/ws/chat'
 
@@ -39,6 +53,7 @@ export function ChatPage() {
   const [activeTools, setActiveTools] = useState<ToolName[]>([])
   const [isAgentTyping, setIsAgentTyping] = useState(false)
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(false)
+  const [voiceMode, setVoiceMode] = useState(false) // true = última mensagem foi por voz
   const [sessionId] = useState(() => generateId())
   const bottomRef = useRef<HTMLDivElement>(null)
   const currentAgentMsgId = useRef<string | null>(null)
@@ -95,12 +110,12 @@ export function ChatPage() {
           const updated = prev.map(m =>
             m.id === msgId ? { ...m, status: 'done' as const } : m
           )
-          // TTS — read content from updated state, no external dep on messages
-          if (voiceOutputEnabled && msgId) {
+          // TTS automático: fala se voiceOutput ativo OU se veio de interação por voz
+          if ((voiceOutputEnabled || voiceMode) && msgId) {
             const doneMsg = updated.find(m => m.id === msgId)
             if (doneMsg) {
-              const plainText = doneMsg.content.replace(/[#*`_~\[\]]/g, '').trim()
-              voiceOutput.speak(plainText)
+              const plainText = stripForVoice(doneMsg.content)
+              if (plainText) voiceOutput.speak(plainText)
             }
           }
           return updated
@@ -124,7 +139,7 @@ export function ChatPage() {
         break
       }
     }
-  }, [voiceOutputEnabled, voiceOutput])
+  }, [voiceOutputEnabled, voiceOutput, voiceMode])
 
   const { isConnected, send } = useWebSocket(wsUrl ?? '', {
     onMessage: handleWSMessage,
@@ -136,7 +151,8 @@ export function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isAgentTyping])
 
-  const handleSend = useCallback((content: string) => {
+  const handleSend = useCallback((content: string, fromVoice = false) => {
+    setVoiceMode(fromVoice)
     const userMsg: Message = {
       id: generateId(),
       role: 'user',
@@ -151,12 +167,12 @@ export function ChatPage() {
     setIsAgentTyping(true)
     setMessages(prev => [...prev, userMsg])
 
-    send({ type: 'user_message', content, sessionId })
+    send({ type: 'user_message', content, sessionId, voiceMode })
   }, [send, sessionId])
 
   return (
     <div className="flex flex-col h-screen noc-grid scanlines">
-      <Header user={user} isConnected={isConnected} onLogout={logout} />
+      <Header user={user} isConnected={isConnected} onLogout={logout} voiceMode={voiceMode} />
 
       {/* Messages area */}
       <main className="flex-1 overflow-y-auto py-4 space-y-1">
@@ -172,6 +188,7 @@ export function ChatPage() {
       {/* Input area */}
       <ChatInput
         onSend={handleSend}
+        onVoiceSend={(content) => handleSend(content, true)}
         disabled={!isConnected || isAgentTyping}
         voiceOutputState={voiceOutput.state}
         voiceOutputEnabled={voiceOutputEnabled}

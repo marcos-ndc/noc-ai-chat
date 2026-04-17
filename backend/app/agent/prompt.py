@@ -145,5 +145,32 @@ _PROFILE_ADDENDUM = {
 }
 
 
-def get_system_prompt(profile: UserProfile) -> str:
-    return _BASE_PROMPT + _PROFILE_ADDENDUM.get(profile, "")
+_VOICE_ADDENDUM = """
+
+## Modo de Resposta: VOZ ATIVA 🎙️
+
+O usuário interagiu por VOZ. Sua resposta será lida em voz alta.
+
+REGRAS ABSOLUTAS para este modo:
+- **PROIBIDO:** tabelas Markdown, gráficos (```chart), bullet points com hífens/asteriscos, código, cabeçalhos (##)
+- **OBRIGATÓRIO:** texto corrido, parágrafos curtos, linguagem falada natural
+- **TAMANHO:** máximo 4-5 frases por assunto — o usuário está ouvindo, não lendo
+- **NÚMEROS:** fale por extenso quando ajudar ("noventa e oito vírgula cinco por cento" → "98,5%")
+- **ESTRUTURA:** use conectivos orais ("Além disso,", "Por outro lado,", "O ponto mais crítico é...")
+- **SEM:** "conforme a tabela abaixo", "veja o gráfico", "como mostrado acima"
+
+Exemplo de resposta CORRETA em voz:
+"O ambiente do cliente A está estável. Há dois alertas ativos no Zabbix: um de CPU alta no servidor web, com 85% de uso há 40 minutos, e um de disco no banco de dados, já em 92% de ocupação. Recomendo iniciar pelo banco de dados, pois está mais próximo do limite crítico."
+
+Exemplo de resposta ERRADA em voz:
+"| Host | Severidade | Duração |
+|------|-----------|---------|
+| web-01 | High | 40min |"
+"""
+
+
+def get_system_prompt(profile: UserProfile, voice_mode: bool = False) -> str:
+    prompt = _BASE_PROMPT + _PROFILE_ADDENDUM.get(profile, "")
+    if voice_mode:
+        prompt += _VOICE_ADDENDUM
+    return prompt

@@ -64,6 +64,7 @@ export interface WSOutboundMessage {
   type: 'user_message'
   content: string
   sessionId: string
+  voiceMode?: boolean   // true quando mensagem veio de voz → agente responde em texto oral
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import type { VoiceOutputState } from '../../types'
 
 interface ChatInputProps {
   onSend: (content: string) => void
+  onVoiceSend?: (content: string) => void  // called when text comes from voice input
   disabled?: boolean
   voiceOutputState?: VoiceOutputState
   voiceOutputEnabled?: boolean
@@ -16,6 +17,7 @@ interface ChatInputProps {
 
 export function ChatInput({
   onSend,
+  onVoiceSend,
   disabled = false,
   voiceOutputState = 'idle',
   voiceOutputEnabled = false,
@@ -26,8 +28,11 @@ export function ChatInput({
   const [value, setValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  const fromVoiceRef = useRef(false)
+
   const voiceInput = useVoiceInput({
     onResult: (transcript) => {
+      fromVoiceRef.current = true
       setValue(transcript)
       textareaRef.current?.focus()
     },
@@ -51,10 +56,15 @@ export function ChatInput({
   const handleSend = useCallback(() => {
     const trimmed = value.trim()
     if (!trimmed || disabled) return
-    onSend(trimmed)
+    if (fromVoiceRef.current && onVoiceSend) {
+      onVoiceSend(trimmed)
+    } else {
+      onSend(trimmed)
+    }
+    fromVoiceRef.current = false
     setValue('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
-  }, [value, disabled, onSend])
+  }, [value, disabled, onSend, onVoiceSend])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {

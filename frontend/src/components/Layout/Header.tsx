@@ -4,6 +4,7 @@ interface HeaderProps {
   user: User | null
   isConnected: boolean
   onLogout: () => void
+  voiceMode?: boolean
 }
 
 const profileLabel: Record<string, string> = {
@@ -13,7 +14,7 @@ const profileLabel: Record<string, string> = {
   manager: 'Gestor',
 }
 
-export function Header({ user, isConnected, onLogout }: HeaderProps) {
+export function Header({ user, isConnected, onLogout, voiceMode = false }: HeaderProps) {
   return (
     <header className="flex items-center justify-between px-4 py-3 border-b border-noc-border bg-noc-surface/80 backdrop-blur-sm">
       {/* Left — brand */}
@@ -34,11 +35,14 @@ export function Header({ user, isConnected, onLogout }: HeaderProps) {
           <h1 className="text-sm font-display font-bold text-noc-text tracking-tight leading-none">
             NOC<span className="text-noc-accent"> AI</span>
           </h1>
-          <p className="text-[10px] text-noc-muted font-mono leading-none mt-0.5">
+          <p className="text-[10px] text-noc-muted font-mono leading-none mt-0.5 flex items-center gap-2">
             {isConnected ? (
               <span className="text-noc-success">● online</span>
             ) : (
               <span className="text-noc-danger">● reconectando...</span>
+            )}
+            {voiceMode && (
+              <span className="text-noc-accent animate-pulse">🎙️ voz</span>
             )}
           </p>
         </div>
