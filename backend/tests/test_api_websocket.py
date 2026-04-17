@@ -105,42 +105,64 @@ class TestWebSocketMessages:
             # If we get here without exception, message was accepted
             # (async response may arrive after test client closes — that's ok)
 
-    def test_orchestrator_process_message_yields_tokens(self):
+    @pytest.mark.asyncio
+    async def test_orchestrator_process_message_yields_tokens(self):
         """Unit test: orchestrator.process_message yields agent_token + agent_done."""
-        import asyncio
+        from unittest.mock import AsyncMock, MagicMock
         from app.agent.orchestrator import AgentOrchestrator
         from app.models import SessionData, UserProfile, WSEventType
+        from app.settings import settings
 
-        mock_redis_inst = AsyncMock()
-        mock_redis_inst.get = AsyncMock(return_value=None)
-        mock_redis_inst.set = AsyncMock(return_value=True)
+        # ── Mocks ─────────────────────────────────────────────────────────────
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.set = AsyncMock(return_value=True)
 
-        mock_block = MagicMock()
-        mock_block.type = "text"
-        mock_block.text = "Resposta do agente."
-        mock_response = MagicMock()
-        mock_response.content = [mock_block]
-        mock_response.stop_reason = "end_turn"
+        # probe call: returns no tool_use → triggers stream pass
+        mock_probe_block = MagicMock()
+        mock_probe_block.type = "text"
+        mock_probe_response = MagicMock()
+        mock_probe_response.content = [mock_probe_block]
+        mock_probe_response.stop_reason = "end_turn"
 
-        orch = AgentOrchestrator()
-        orch._client = MagicMock()
-        orch._client.messages.create = MagicMock(return_value=mock_response)
+        # streaming context manager
+        mock_stream_ctx = AsyncMock()
+        mock_stream_ctx.__aenter__ = AsyncMock(return_value=mock_stream_ctx)
+        mock_stream_ctx.__aexit__ = AsyncMock(return_value=False)
 
-        session = SessionData(
-            session_id="unit-test-sess",
-            user_id="user-1",
-            user_profile=UserProfile.N2,
-        )
+        async def fake_text_stream():
+            for token in ["Olá ", "mundo ", "!"]:
+                yield token
 
-        async def run():
+        mock_stream_ctx.text_stream = fake_text_stream()
+
+        # ── Patch settings (singleton — must patch object, not env var) ───────
+        original_key = settings.anthropic_api_key
+        settings.anthropic_api_key = "sk-test-mock-key-for-testing"
+
+        try:
+            orch = AgentOrchestrator()
+            orch._client = AsyncMock()
+            orch._client.messages.create = AsyncMock(return_value=mock_probe_response)
+            orch._client.messages.stream = MagicMock(return_value=mock_stream_ctx)
+
+            session = SessionData(
+                session_id="unit-test-sess",
+                user_id="user-1",
+                user_profile=UserProfile.N2,
+            )
+
             from app.agent.session import session_manager
-            session_manager.redis = mock_redis_inst
-            events = []
-            async for event in orch.process_message("Olá!", session):
-                events.append(event)
-            return events
+            session_manager.redis = mock_redis
 
-        events = asyncio.get_event_loop().run_until_complete(run())
-        event_types = [e.type for e in events]
-        assert WSEventType.agent_done in event_types
-        assert any(e.type == WSEventType.agent_token for e in events)
+            events = []
+            async for event in orch.process_message("Olá agente", session):
+                events.append(event)
+
+            types = [e.type for e in events]
+            assert WSEventType.agent_token in types, f"No agent_token in {types}"
+            assert WSEventType.agent_done  in types, f"No agent_done in {types}"
+            tokens = [e.content for e in events if e.type == WSEventType.agent_token]
+            assert len(tokens) > 0
+        finally:
+            settings.anthropic_api_key = original_key
