@@ -168,6 +168,7 @@ class AgentOrchestrator:
         self,
         user_message: str,
         session: SessionData,
+        voice_mode: bool = False,
     ) -> AsyncGenerator[WSOutbound, None]:
         """
         Yields: tool_start → tool_end → agent_token (real streaming) → agent_done
@@ -187,7 +188,7 @@ class AgentOrchestrator:
         session.messages.append(ChatMessage(role=MessageRole.user, content=user_message))
         await session_manager.save_session(session)
 
-        system_prompt = get_system_prompt(session.user_profile)
+        system_prompt = get_system_prompt(session.user_profile, voice_mode=voice_mode)
         message_id = str(uuid.uuid4())[:8]
 
         # CR-5: correct role mapping (agent → assistant)

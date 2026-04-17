@@ -118,6 +118,7 @@ async def handle_chat_websocket(ws: WebSocket) -> None:
                 async for event in orchestrator.process_message(
                     user_message=inbound.content,
                     session=session,
+                    voice_mode=inbound.voiceMode,
                 ):
                     await manager.send(connection_id, event)
 

@@ -78,6 +78,7 @@ class WSInbound(BaseModel):
     type: WSEventType
     content: Optional[str] = None
     sessionId: Optional[str] = None
+    voiceMode: bool = False  # True quando mensagem veio de entrada por voz
 
 class WSOutbound(BaseModel):
     type: WSEventType
