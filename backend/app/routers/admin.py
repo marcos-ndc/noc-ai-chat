@@ -120,10 +120,11 @@ async def test_ai_config(
     if not api_key:
         return {"success": False, "error": "API key não configurada"}
 
+    is_openrouter = cfg.provider == AIProvider.openrouter
     try:
         client = orchestrator._build_client(
             api_key,
-            cfg.openrouter_base_url if cfg.provider == AIProvider.openrouter else None,
+            cfg.openrouter_base_url if is_openrouter else None,
         )
         extra: dict = {}
         if cfg.provider == AIProvider.openrouter:
@@ -175,8 +176,12 @@ async def test_ai_config(
             hint = f"Erro no servidor do provedor (HTTP {status_code}). Tente novamente em instantes."
             short = f"HTTP {status_code} — erro no servidor"
         elif "timeout" in err_raw.lower() or "Timeout" in type(e).__name__:
-            hint = "Timeout — modelo sobrecarregado ou rede lenta. Tente novamente ou escolha outro modelo."
-            short = "Timeout na conexão"
+            if is_openrouter:
+                hint = "Proxy/firewall bloqueando openrouter.ai. Verifique se ANTHROPIC_SSL_VERIFY=false está no .env e reinicie o backend."
+                short = "Timeout — possível bloqueio de proxy SSL corporativo"
+            else:
+                hint = "Proxy/firewall bloqueando api.anthropic.com. Verifique se ANTHROPIC_SSL_VERIFY=false está no .env."
+                short = "Timeout — possível bloqueio de proxy SSL corporativo"
         elif "SSL" in err_raw or "certificate" in err_raw.lower() or "CERTIFICATE" in err_raw:
             hint = "Erro SSL. Adicione OPENROUTER_SSL_VERIFY=false no .env (proxy corporativo)."
             short = "Erro de certificado SSL"
