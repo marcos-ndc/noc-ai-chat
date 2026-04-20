@@ -5,6 +5,15 @@ import type { AIConfigInput, AIConfigOut, AdminStatus, ModelOption, TestResult }
 
 const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
+interface TTSStatus {
+  available: boolean
+  voice:     string
+  model:     string
+  speed:     number
+  voices:    Record<string, { label: string; desc: string; gender: string }>
+  models:    Record<string, string>
+}
+
 function useAdminAPI() {
   const token = useAuthStore(s => s.token)
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
@@ -143,6 +152,12 @@ export function AdminPage() {
   const [testing,   setTesting]   = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [saveMsg,   setSaveMsg]   = useState('')
+  const [ttsInfo,   setTtsInfo]   = useState<TTSStatus | null>(null)
+  const [ttsVoice,  setTtsVoice]  = useState('onyx')
+  const [ttsModel,  setTtsModel]  = useState('tts-1-hd')
+  const [ttsSpeed,  setTtsSpeed]  = useState(0.92)
+  const [ttsSaving, setTtsSaving] = useState(false)
+  const [ttsSaveMsg, setTtsSaveMsg] = useState('')
 
   // Form state
   const [provider,    setProvider]    = useState<'anthropic' | 'openrouter'>('anthropic')
@@ -168,7 +183,14 @@ export function AdminPage() {
       api.get('/admin/ai-config'),
       api.get('/admin/models'),
       api.get('/admin/status'),
-    ]).then(([cfg, mdls, st]) => {
+      api.get('/tts/status'),
+    ]).then(([cfg, mdls, st, tts]) => {
+      setTtsInfo(tts)
+      if (tts?.available) {
+        setTtsVoice(tts.voice)
+        setTtsModel(tts.model)
+        setTtsSpeed(tts.speed)
+      }
       setConfig(cfg)
       setModels(mdls)
       setStatus(st)
@@ -499,6 +521,126 @@ export function AdminPage() {
             )}
           </div>
         )}
+
+        {/* TTS Voice Settings */}
+        <SectionCard title="VOZ — TEXTO PARA FALA" icon="🎙️">
+          {!ttsInfo?.available ? (
+            <div className="p-4 rounded-xl bg-noc-warning/5 border border-noc-warning/30 text-xs font-mono text-noc-warning space-y-2">
+              <p className="font-bold">⚠️ Voz premium não configurada</p>
+              <p className="text-noc-muted">Adicione <span className="text-noc-accent">OPENAI_API_KEY=sk-...</span> no <span className="text-noc-accent">.env</span> e reinicie o backend para ativar a voz OpenAI.</p>
+              <p className="text-noc-muted">Sem a chave, o sistema usa a voz do navegador (qualidade inferior).</p>
+              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer"
+                 className="inline-block mt-1 text-noc-accent hover:underline">
+                → Obter chave em platform.openai.com/api-keys
+              </a>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-noc-success/10 border border-noc-success/30 text-xs font-mono text-noc-success">
+                <span>✓</span>
+                <span>Voz premium OpenAI ativa — usando <strong>{ttsModel}</strong></span>
+              </div>
+
+              {/* Model selector */}
+              <div>
+                <label className="text-[10px] font-mono text-noc-muted mb-2 block">QUALIDADE DO MODELO</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {ttsInfo.models && Object.entries(ttsInfo.models).map(([id, desc]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setTtsModel(id)}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        ttsModel === id
+                          ? 'border-noc-accent bg-noc-accent/5 shadow-md shadow-noc-accent/10'
+                          : 'border-noc-border/60 hover:border-noc-border bg-noc-bg/30'
+                      }`}
+                    >
+                      <div className={`text-xs font-bold font-mono mb-0.5 flex items-center gap-2 ${ttsModel === id ? 'text-noc-accent' : 'text-noc-text'}`}>
+                        {id === 'tts-1-hd' ? '⭐ ' : ''}{id}
+                        {ttsModel === id && <span className="text-[9px] bg-noc-accent text-noc-bg px-1.5 py-0.5 rounded-full font-bold">ATIVO</span>}
+                      </div>
+                      <p className="text-[11px] text-noc-muted">{desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Voice selector */}
+              <div>
+                <label className="text-[10px] font-mono text-noc-muted mb-2 block">VOZ</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {ttsInfo.voices && Object.entries(ttsInfo.voices).map(([id, v]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setTtsVoice(id)}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        ttsVoice === id
+                          ? 'border-noc-accent bg-noc-accent/5'
+                          : 'border-noc-border/60 hover:border-noc-border bg-noc-bg/30'
+                      }`}
+                    >
+                      <div className={`text-xs font-bold font-mono mb-0.5 flex items-center gap-1.5 ${ttsVoice === id ? 'text-noc-accent' : 'text-noc-text'}`}>
+                        <span>{v.gender === 'masculino' ? '🔵' : v.gender === 'feminino' ? '🔴' : '⚪'}</span>
+                        {v.label}
+                        {ttsVoice === id && <span className="text-[9px] bg-noc-accent text-noc-bg px-1.5 py-0.5 rounded-full font-bold">ATIVA</span>}
+                      </div>
+                      <p className="text-[10px] text-noc-muted leading-relaxed">{v.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Speed slider */}
+              <SliderField
+                label="VELOCIDADE DA FALA"
+                value={ttsSpeed}
+                min={0.75} max={1.25} step={0.05}
+                onChange={setTtsSpeed}
+                format={v => v === 1.0 ? '1.0× (normal)' : `${v.toFixed(2)}×`}
+              />
+              <p className="text-[10px] font-mono text-noc-muted -mt-4">
+                {ttsSpeed < 0.88 ? '🐢 Lento e solene — mais grave, mais claro' :
+                 ttsSpeed > 1.05 ? '🐇 Acelerado — respostas mais ágeis' :
+                 '✅ Natural — ritmo conversacional ideal'}
+              </p>
+
+              {/* Save button */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setTtsSaving(true)
+                    setTtsSaveMsg('')
+                    // Persist to sessionStorage so useVoiceOutput picks up changes
+                    sessionStorage.setItem('tts_voice', ttsVoice)
+                    sessionStorage.setItem('tts_model', ttsModel)
+                    sessionStorage.setItem('tts_speed', String(ttsSpeed))
+                    setTimeout(() => {
+                      setTtsSaveMsg(`✅ Voz ${ttsVoice} (${ttsModel}) será usada nas próximas respostas desta sessão.`)
+                      setTtsSaving(false)
+                      setTimeout(() => setTtsSaveMsg(''), 5000)
+                    }, 300)
+                  }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-noc-accent text-noc-bg text-xs font-bold font-mono hover:bg-noc-accent/90 transition-all shadow-lg shadow-noc-accent/20"
+                >
+                  {ttsSaving ? <div className="w-3.5 h-3.5 border-2 border-noc-bg/30 border-t-noc-bg rounded-full animate-spin" /> : '🎙️'}
+                  Aplicar Voz
+                </button>
+                <div className="text-[10px] font-mono text-noc-muted">
+                  Para tornar permanente: <span className="text-noc-accent">TTS_VOICE={ttsVoice}</span> e <span className="text-noc-accent">TTS_MODEL={ttsModel}</span> no .env
+                </div>
+              </div>
+
+              {ttsSaveMsg && (
+                <div className="px-4 py-2.5 rounded-xl text-xs font-mono border bg-noc-success/10 border-noc-success/30 text-noc-success">
+                  {ttsSaveMsg}
+                </div>
+              )}
+            </div>
+          )}
+        </SectionCard>
 
         {/* Spacer */}
         <div className="h-8" />

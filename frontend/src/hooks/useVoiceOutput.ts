@@ -12,30 +12,53 @@ import type { VoiceOutputState } from '../types'
 
 const API_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
+export interface TTSVoiceOption {
+  label:   string
+  desc:    string
+  gender:  string
+}
+
 interface TTSStatus {
   available: boolean
-  voice: string
-  model: string
+  voice:     string
+  model:     string
+  speed:     number
+  voices:    Record<string, TTSVoiceOption>
+  models:    Record<string, string>
 }
 
 interface UseVoiceOutputReturn {
-  state: VoiceOutputState
-  isSupported: boolean
-  isPremium: boolean        // true = OpenAI TTS ativo
-  currentVoice: string      // nome da voz atual
-  speak: (text: string) => void
-  stop: () => void
-  pause: () => void
-  resume: () => void
+  state:        VoiceOutputState
+  isSupported:  boolean
+  isPremium:    boolean
+  currentVoice: string
+  ttsStatus:    TTSStatus | null
+  speak:        (text: string) => void
+  stop:         () => void
+  pause:        () => void
+  resume:       () => void
+  setVoice:     (voice: string) => void
+  setModel:     (model: string) => void
+  setSpeed:     (speed: number) => void
 }
 
 export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   const [state, setState] = useState<VoiceOutputState>('idle')
-  const [ttsStatus, setTtsStatus] = useState<TTSStatus>({
-    available: false,
-    voice: 'onyx',
-    model: 'tts-1',
-  })
+  const [ttsStatus, setTtsStatus] = useState<TTSStatus | null>(null)
+  // Persist voice settings in sessionStorage so admin panel changes apply to chat
+  const [selectedVoice, setSelectedVoiceState] = useState<string>(
+    () => sessionStorage.getItem('tts_voice') || 'onyx'
+  )
+  const [selectedModel, setSelectedModelState] = useState<string>(
+    () => sessionStorage.getItem('tts_model') || 'tts-1-hd'
+  )
+  const [selectedSpeed, setSelectedSpeedState] = useState<number>(
+    () => parseFloat(sessionStorage.getItem('tts_speed') || '0.92')
+  )
+
+  const setSelectedVoice = (v: string) => { setSelectedVoiceState(v); sessionStorage.setItem('tts_voice', v) }
+  const setSelectedModel = (m: string) => { setSelectedModelState(m); sessionStorage.setItem('tts_model', m) }
+  const setSelectedSpeed = (s: number) => { setSelectedSpeedState(s); sessionStorage.setItem('tts_speed', String(s)) }
 
   const utteranceRef  = useRef<SpeechSynthesisUtterance | null>(null)
   const audioRef      = useRef<HTMLAudioElement | null>(null)
@@ -48,7 +71,12 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   useEffect(() => {
     fetch(`${API_URL}/tts/status`)
       .then(r => r.json())
-      .then((data: TTSStatus) => setTtsStatus(data))
+      .then((data: TTSStatus) => {
+        setTtsStatus(data)
+        setSelectedVoice(data.voice)
+        setSelectedModel(data.model)
+        setSelectedSpeed(data.speed)
+      })
       .catch(() => {/* silently fallback to browser TTS */})
   }, [])
 
@@ -83,7 +111,7 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
       const resp = await fetch(`${API_URL}/tts/speak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, voice: selectedVoice, model: selectedModel, speed: selectedSpeed }),
         signal: abortRef.current.signal,
       })
 
@@ -151,12 +179,12 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   // ── Public speak() — picks premium or fallback ────────────────────────────
   const speak = useCallback((text: string) => {
     if (!text.trim()) return
-    if (ttsStatus.available) {
+    if (ttsStatus?.available) {
       speakPremium(text)
     } else {
       speakBrowser(text)
     }
-  }, [ttsStatus.available, speakPremium, speakBrowser])
+  }, [ttsStatus?.available, speakPremium, speakBrowser])
 
   const pause = useCallback(() => {
     if (audioRef.current) {
@@ -177,11 +205,15 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   return {
     state,
     isSupported,
-    isPremium:   ttsStatus.available,
-    currentVoice: ttsStatus.available ? ttsStatus.voice : 'browser',
+    isPremium:    ttsStatus?.available ?? false,
+    currentVoice: ttsStatus?.available ? selectedVoice : 'browser',
+    ttsStatus,
     speak,
     stop,
     pause,
     resume,
+    setVoice: setSelectedVoice,
+    setModel: setSelectedModel,
+    setSpeed: setSelectedSpeed,
   }
 }
