@@ -35,31 +35,43 @@ def require_admin(creds: HTTPAuthorizationCredentials = Depends(_bearer)) -> Use
 # ─── Model catalog ────────────────────────────────────────────────────────────
 
 MODELS: list[ModelOption] = [
-    # Anthropic
-    ModelOption(id="claude-opus-4-5",            name="Claude Opus 4.5",          provider=AIProvider.anthropic,  description="Mais poderoso — análise profunda e raciocínio complexo",     context_k=200),
-    ModelOption(id="claude-sonnet-4-5",          name="Claude Sonnet 4.5",        provider=AIProvider.anthropic,  description="Equilíbrio ideal entre velocidade e qualidade (recomendado)", context_k=200),
-    ModelOption(id="claude-sonnet-4-20250514",   name="Claude Sonnet 4 (stable)", provider=AIProvider.anthropic,  description="Versão estável do Sonnet 4 — alta confiabilidade",             context_k=200),
-    ModelOption(id="claude-haiku-4-5-20251001",  name="Claude Haiku 4.5",         provider=AIProvider.anthropic,  description="Mais rápido e econômico — respostas simples e triagem",        context_k=200),
-    # OpenRouter — Anthropic via OR
-    ModelOption(id="anthropic/claude-opus-4-5",           name="Claude Opus 4.5 (OR)",    provider=AIProvider.openrouter, description="Claude Opus via OpenRouter",                                   context_k=200),
-    ModelOption(id="anthropic/claude-sonnet-4-5",         name="Claude Sonnet 4.5 (OR)",  provider=AIProvider.openrouter, description="Claude Sonnet via OpenRouter",                                 context_k=200),
-    # OpenRouter — OpenAI
-    ModelOption(id="openai/gpt-4o",              name="GPT-4o",                   provider=AIProvider.openrouter, description="OpenAI GPT-4o via OpenRouter",                                context_k=128),
-    ModelOption(id="openai/gpt-4o-mini",         name="GPT-4o Mini",              provider=AIProvider.openrouter, description="GPT-4o Mini — rápido e econômico",                            context_k=128),
-    ModelOption(id="openai/o1",                  name="OpenAI o1",                provider=AIProvider.openrouter, description="OpenAI o1 — raciocínio avançado",                             context_k=200),
-    # OpenRouter — Google
-    ModelOption(id="google/gemini-2.0-flash-001", name="Gemini 2.0 Flash",        provider=AIProvider.openrouter, description="Google Gemini 2.0 Flash — muito rápido",                     context_k=1000),
-    ModelOption(id="google/gemini-pro-1.5",      name="Gemini Pro 1.5",           provider=AIProvider.openrouter, description="Google Gemini Pro 1.5",                                       context_k=1000),
-    # OpenRouter — Meta / OSS
-    ModelOption(id="meta-llama/llama-3.3-70b-instruct",  name="Llama 3.3 70B",   provider=AIProvider.openrouter, description="Meta Llama 3.3 70B — open source de alta qualidade",         context_k=128),
-    ModelOption(id="meta-llama/llama-3.1-8b-instruct",   name="Llama 3.1 8B",    provider=AIProvider.openrouter, description="Llama 3.1 8B — rápido e leve",                               context_k=128),
-    ModelOption(id="mistralai/mistral-large",    name="Mistral Large",            provider=AIProvider.openrouter, description="Mistral Large — excelente custo-benefício",                   context_k=128),
-    ModelOption(id="deepseek/deepseek-r1",       name="DeepSeek R1",              provider=AIProvider.openrouter, description="DeepSeek R1 — raciocínio de alta qualidade",                 context_k=164),
-    # OpenRouter — NVIDIA
-    ModelOption(id="nvidia/nemotron-3-super-120b-a12b", name="NVIDIA Nemotron 3 Super 120B", provider=AIProvider.openrouter, description="MoE 120B, ativa 12B — grátis, 1M ctx, ótimo para agentes", context_k=1000),
-    ModelOption(id="nvidia/llama-3.1-nemotron-70b-instruct", name="NVIDIA Nemotron 70B",     provider=AIProvider.openrouter, description="Llama 3.1 70B ajustado pela NVIDIA — grátis",              context_k=128),
-]
+    # ── Anthropic (direto) ────────────────────────────────────────────────────
+    ModelOption(id="claude-opus-4-5",           name="Claude Opus 4.5",           provider=AIProvider.anthropic,  description="Mais poderoso — raciocínio profundo e tarefas complexas",          context_k=200),
+    ModelOption(id="claude-sonnet-4-5",         name="Claude Sonnet 4.5",         provider=AIProvider.anthropic,  description="Equilíbrio ideal velocidade/qualidade (recomendado)",              context_k=200),
+    ModelOption(id="claude-sonnet-4-20250514",  name="Claude Sonnet 4 (stable)",  provider=AIProvider.anthropic,  description="Versão estável e confiável do Sonnet 4",                          context_k=200),
+    ModelOption(id="claude-haiku-4-5-20251001", name="Claude Haiku 4.5",          provider=AIProvider.anthropic,  description="Mais rápido e econômico — triagem e respostas simples",           context_k=200),
 
+    # ── OpenRouter — Anthropic ────────────────────────────────────────────────
+    ModelOption(id="anthropic/claude-opus-4-5",          name="Claude Opus 4.5 (OR)",   provider=AIProvider.openrouter, description="Claude Opus via OpenRouter",                               context_k=200),
+    ModelOption(id="anthropic/claude-sonnet-4-5",        name="Claude Sonnet 4.5 (OR)", provider=AIProvider.openrouter, description="Claude Sonnet via OpenRouter — recomendado",               context_k=200),
+    ModelOption(id="anthropic/claude-haiku-4-5",         name="Claude Haiku 4.5 (OR)",  provider=AIProvider.openrouter, description="Claude Haiku via OpenRouter — rápido e barato",            context_k=200),
+
+    # ── OpenRouter — OpenAI ───────────────────────────────────────────────────
+    ModelOption(id="openai/gpt-4o",             name="GPT-4o",               provider=AIProvider.openrouter, description="GPT-4o — multimodal, rápido e capaz",                              context_k=128),
+    ModelOption(id="openai/gpt-4o-mini",        name="GPT-4o Mini",          provider=AIProvider.openrouter, description="GPT-4o Mini — mais leve e econômico",                              context_k=128),
+    ModelOption(id="openai/gpt-oss-120b",       name="GPT-OSS 120B",         provider=AIProvider.openrouter, description="Primeiro modelo open-weight da OpenAI — Apache 2.0, grátis",       context_k=128),
+
+    # ── OpenRouter — Google ───────────────────────────────────────────────────
+    ModelOption(id="google/gemini-2.5-flash-lite", name="Gemini 2.5 Flash Lite", provider=AIProvider.openrouter, description="Google Gemini — mais rápido e barato da família 2.5",          context_k=1000),
+    ModelOption(id="google/gemini-2.0-flash-001",  name="Gemini 2.0 Flash",      provider=AIProvider.openrouter, description="Google Gemini 2.0 Flash — velocidade e qualidade",             context_k=1000),
+
+    # ── OpenRouter — Meta ─────────────────────────────────────────────────────
+    ModelOption(id="meta-llama/llama-3.3-70b-instruct", name="Llama 3.3 70B",   provider=AIProvider.openrouter, description="Meta Llama 3.3 70B — open source, nível GPT-4, grátis",        context_k=128),
+    ModelOption(id="meta-llama/llama-3.1-8b-instruct",  name="Llama 3.1 8B",    provider=AIProvider.openrouter, description="Llama 3.1 8B — leve, grátis, bom para tarefas simples",        context_k=128),
+
+    # ── OpenRouter — Mistral ──────────────────────────────────────────────────
+    ModelOption(id="mistralai/mistral-large-2512",           name="Mistral Large 3",      provider=AIProvider.openrouter, description="Mistral Large 3 — 675B total, 41B ativo (MoE), Apache 2.0", context_k=262),
+    ModelOption(id="mistralai/mistral-small-3.2-24b-instruct-2506", name="Mistral Small 3.2", provider=AIProvider.openrouter, description="Mistral Small 3.2 24B — equilibrado, bom custo-benefício", context_k=128),
+
+    # ── OpenRouter — DeepSeek ─────────────────────────────────────────────────
+    ModelOption(id="deepseek/deepseek-r1",      name="DeepSeek R1",          provider=AIProvider.openrouter, description="DeepSeek R1 — raciocínio avançado, grátis (tier free disponível)", context_k=164),
+
+    # ── OpenRouter — NVIDIA ───────────────────────────────────────────────────
+    ModelOption(id="nvidia/nemotron-3-super-120b-a12b", name="NVIDIA Nemotron 3 Super 120B", provider=AIProvider.openrouter, description="MoE 120B, ativa 12B, 262K ctx — grátis (não use :free no ID)", context_k=262),
+
+    # ── OpenRouter — Qwen ─────────────────────────────────────────────────────
+    ModelOption(id="qwen/qwen3-235b-a22b",      name="Qwen3 235B",           provider=AIProvider.openrouter, description="Qwen3 MoE 235B — ótimo raciocínio, grátis",                       context_k=128),
+]
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
