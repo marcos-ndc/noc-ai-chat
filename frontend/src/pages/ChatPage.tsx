@@ -202,7 +202,8 @@ export function ChatPage() {
 
       {/* Hands-free banner */}
       {wakeWord.state !== 'off' && (
-        <div className="flex items-center justify-between px-4 py-2 bg-noc-accent/10 border-t border-noc-accent/20">
+        <div className="flex items-center justify-between px-4 py-2 bg-noc-accent/10 border-t border-noc-accent/20"
+          onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-2 text-xs font-mono text-noc-accent">
             <span className={`w-2 h-2 rounded-full bg-noc-accent ${wakeWord.state === 'listening' ? 'animate-ping' : 'animate-pulse'}`} />
             {wakeWord.state === 'standby'  && <>👂 Aguardando... diga &ldquo;Olá NOC&rdquo;</>}
@@ -210,7 +211,7 @@ export function ChatPage() {
             {wakeWord.state === 'waiting'  && <>⏳ Processando...</>}
             {wakeWord.state === 'speaking' && <>🔊 Respondendo...</>}
           </div>
-          <button type="button" onClick={wakeWord.deactivate}
+          <button type="button" onClick={e => { e.stopPropagation(); wakeWord.deactivate() }}
             className="text-[10px] font-mono text-noc-muted hover:text-noc-danger transition-colors px-2 py-1 rounded border border-noc-border/40">
             Encerrar modo voz
           </button>
@@ -232,7 +233,14 @@ export function ChatPage() {
         onVoiceOutputStop={voiceOutput.stop}
         handsFreeActive={wakeWord.state !== 'off'}
         handsFreeSupported={wakeWord.isSupported}
-        onHandsFreeToggle={() => wakeWord.state !== 'off' ? wakeWord.deactivate() : wakeWord.activate()}
+        onHandsFreeToggle={() => {
+          // Read from ref to avoid stale closure, and stop any event propagation
+          if (wakeWord.state !== 'off') {
+            wakeWord.deactivate()
+          } else {
+            wakeWord.activate()
+          }
+        }}
         placeholder={
           !isConnected
             ? 'Aguardando conexão...'
