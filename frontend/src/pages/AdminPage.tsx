@@ -334,6 +334,11 @@ export function AdminPage() {
               placeholder={model}
               className="w-full px-3 py-2 bg-noc-bg border border-noc-border rounded-lg text-xs font-mono text-noc-text placeholder:text-noc-muted/50 focus:outline-none focus:border-noc-accent/60"
             />
+            <p className="text-[10px] text-noc-muted font-mono mt-1.5">
+              ⚠️ Não use o sufixo <span className="text-noc-accent">:free</span> no ID — use apenas <span className="text-noc-accent">nvidia/nemotron-3-super-120b-a12b</span> sem ele.
+              Encontre IDs em{' '}
+              <a href="https://openrouter.ai/models" target="_blank" rel="noreferrer" className="text-noc-accent hover:underline">openrouter.ai/models</a>
+            </p>
           </div>
         </SectionCard>
 

@@ -55,6 +55,9 @@ MODELS: list[ModelOption] = [
     ModelOption(id="meta-llama/llama-3.1-8b-instruct",   name="Llama 3.1 8B",    provider=AIProvider.openrouter, description="Llama 3.1 8B — rápido e leve",                               context_k=128),
     ModelOption(id="mistralai/mistral-large",    name="Mistral Large",            provider=AIProvider.openrouter, description="Mistral Large — excelente custo-benefício",                   context_k=128),
     ModelOption(id="deepseek/deepseek-r1",       name="DeepSeek R1",              provider=AIProvider.openrouter, description="DeepSeek R1 — raciocínio de alta qualidade",                 context_k=164),
+    # OpenRouter — NVIDIA
+    ModelOption(id="nvidia/nemotron-3-super-120b-a12b", name="NVIDIA Nemotron 3 Super 120B", provider=AIProvider.openrouter, description="MoE 120B, ativa 12B — grátis, 1M ctx, ótimo para agentes", context_k=1000),
+    ModelOption(id="nvidia/llama-3.1-nemotron-70b-instruct", name="NVIDIA Nemotron 70B",     provider=AIProvider.openrouter, description="Llama 3.1 70B ajustado pela NVIDIA — grátis",              context_k=128),
 ]
 
 
