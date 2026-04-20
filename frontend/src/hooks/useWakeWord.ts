@@ -14,8 +14,24 @@ export type HandsFreeState =
   | 'waiting'   // aguardando resposta do agente
   | 'speaking'  // TTS reproduzindo — logo vai ouvir de novo
 
-const WAKE_WORDS = ['olá noc', 'ola noc', 'hey noc', 'ei noc', 'oi noc']
-const STOP_WORDS = ['noc obrigado', 'tchau noc', 'pare noc', 'noc tchau', 'desligar']
+const WAKE_WORDS = [
+  // Pronúncias corretas
+  'olá noc', 'ola noc', 'hey noc', 'ei noc', 'oi noc',
+  // Como o pt-BR reconhece "NOC" falado
+  'olá nokia', 'ola nokia', 'hey nokia',
+  'olá knock', 'ola knock',
+  'olá nok', 'ola nok', 'hey nok',
+  'olá nóc', 'ola nóc',
+  'olá noque', 'ola noque',
+  'olá norte', 'ola norte',  // às vezes reconhece "noc" como "norte"
+  // Só "noc" em qualquer posição (captura "ei, noc!", "noc!" etc)
+  ' noc ', 'nokia', 'nok ',
+]
+const STOP_WORDS = [
+  'noc obrigado', 'tchau noc', 'pare noc', 'noc tchau', 'desligar',
+  'nokia obrigado', 'tchau nokia', 'pare nokia',
+  'nok obrigado', 'tchau nok',
+]
 
 interface Options {
   onQuery:    (text: string) => void
@@ -49,8 +65,9 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
 
   const killRec = useCallback(() => {
     if (recRef.current) {
-      try { recRef.current.abort() } catch { /* ignore */ }
-      recRef.current = null
+      const rec = recRef.current
+      recRef.current = null          // null FIRST so onend/onerror don't restart
+      try { rec.abort() } catch { /* ignore */ }
     }
   }, [])
 
