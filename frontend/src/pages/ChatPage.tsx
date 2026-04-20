@@ -157,12 +157,7 @@ export function ChatPage() {
     disabled: !isConnected,
   })
 
-  // Auto-ativa TTS quando modo hands-free liga
-  useEffect(() => {
-    if (wakeWord.state !== 'off' && !voiceOutputEnabled) {
-      setVoiceOutputEnabled(true)
-    }
-  }, [wakeWord.state]) // eslint-disable-line react-hooks/exhaustive-deps
+  // TTS ativado automaticamente via wakeWord.state check no agent_done handler
 
   // Auto-scroll to bottom
   useEffect(() => {
