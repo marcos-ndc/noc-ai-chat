@@ -136,27 +136,26 @@ def _tool_to_noc_name(tool_name: str) -> Optional[ToolName]:
 
 class AgentOrchestrator:
     def __init__(self) -> None:
-        # CR-2: AsyncAnthropic — non-blocking, never stalls the event loop
-        # Corporate proxy/SSL support via environment variables:
-        #   ANTHROPIC_SSL_VERIFY=false  — disable SSL verification (last resort)
-        #   REQUESTS_CA_BUNDLE=/path/to/corp-ca.pem  — custom CA bundle
-        import httpx, os
-        ca_cert = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
-        ssl_verify = os.environ.get("ANTHROPIC_SSL_VERIFY", "true").lower() != "false"
-
-        if ca_cert:
-            http_client = httpx.AsyncClient(verify=ca_cert)
-            self._client = AsyncAnthropic(api_key=settings.anthropic_api_key, http_client=http_client)
-        elif not ssl_verify:
-            import warnings
-            warnings.warn("SSL verification disabled for Anthropic API — not recommended for production")
-            http_client = httpx.AsyncClient(verify=False)
-            self._client = AsyncAnthropic(api_key=settings.anthropic_api_key, http_client=http_client)
-        else:
-            self._client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-
+        # Client built per-request via process_message to support runtime config changes
         self._mcp_dispatcher: Optional["MCPDispatcher"] = None
 
+    def _build_client(self, api_key: str, base_url: Optional[str] = None) -> AsyncAnthropic:
+        import httpx, os
+        ca_cert    = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
+        ssl_verify = os.environ.get("ANTHROPIC_SSL_VERIFY", "true").lower() != "false"
+
+        kwargs: dict = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+
+        if ca_cert:
+            kwargs["http_client"] = httpx.AsyncClient(verify=ca_cert)
+        elif not ssl_verify:
+            import warnings
+            warnings.warn("SSL verification disabled for Anthropic API")
+            kwargs["http_client"] = httpx.AsyncClient(verify=False)
+
+        return AsyncAnthropic(**kwargs)
     @property
     def mcp_dispatcher(self) -> "MCPDispatcher":
         if self._mcp_dispatcher is None:
@@ -179,11 +178,28 @@ class AgentOrchestrator:
           3. If stream ends with end_turn: done
         This is ONE API call per iteration (not two), with real streaming.
         """
-        if not settings.anthropic_api_key:
+        # Load runtime AI config (provider + model + api_key from admin panel)
+        from app.agent.ai_config import ai_config_store
+        from app.models import AIProvider
+        cfg = await ai_config_store.get()
+
+        api_key  = cfg.api_key or settings.anthropic_api_key
+        base_url = cfg.openrouter_base_url if cfg.provider == AIProvider.openrouter else None
+
+        if not api_key:
             raise ValueError(
-                "ANTHROPIC_API_KEY não configurada. "
-                "Adicione sua chave no arquivo .env e reinicie o stack."
+                "API key nao configurada. "
+                "Configure em /admin ou adicione ANTHROPIC_API_KEY no .env."
             )
+
+        client = self._build_client(api_key, base_url)
+
+        extra_headers: dict = {}
+        if cfg.provider == AIProvider.openrouter:
+            if cfg.site_url:
+                extra_headers["HTTP-Referer"] = cfg.site_url
+            if cfg.site_name:
+                extra_headers["X-Title"] = cfg.site_name
 
         session.messages.append(ChatMessage(role=MessageRole.user, content=user_message))
         await session_manager.save_session(session)
@@ -191,7 +207,6 @@ class AgentOrchestrator:
         system_prompt = get_system_prompt(session.user_profile, voice_mode=voice_mode)
         message_id = str(uuid.uuid4())[:8]
 
-        # CR-5: correct role mapping (agent → assistant)
         claude_messages = session_manager.build_claude_messages(session)
 
         full_response = ""
@@ -202,12 +217,13 @@ class AgentOrchestrator:
             tool_calls: list[dict] = []
 
             # CR-3: real streaming — text tokens arrive as Claude generates them
-            async with self._client.messages.stream(
-                model=settings.claude_model,
-                max_tokens=4096,
+            async with client.messages.stream(
+                model=cfg.model,
+                max_tokens=cfg.max_tokens,
                 system=system_prompt,
                 tools=MCP_TOOLS,  # type: ignore[arg-type]
                 messages=claude_messages,
+                **({"extra_headers": extra_headers} if extra_headers else {}),
             ) as stream:
                 # Stream text tokens to the client in real time
                 async for text in stream.text_stream:
