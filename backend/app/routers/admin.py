@@ -137,122 +137,87 @@ async def test_ai_config(
 
     is_openrouter = cfg.provider == AIProvider.openrouter
     try:
-        import anthropic as _anthropic
-        client = orchestrator._build_client(
-            api_key,
-            cfg.openrouter_base_url if is_openrouter else None,
-        )
-        extra: dict = {}
         if is_openrouter:
-            if cfg.site_url:  extra["HTTP-Referer"] = cfg.site_url
-            if cfg.site_name: extra["X-Title"] = cfg.site_name
-
-        resp = await client.messages.create(
-            model=cfg.model,
-            max_tokens=50,
-            messages=[{"role": "user", "content": "Responda apenas: OK"}],
-            **({"extra_headers": extra} if extra else {}),
-        )
-        reply = resp.content[0].text if resp.content else ""
-        return {
-            "success": True,
-            "provider": cfg.provider,
-            "model": cfg.model,
-            "response": reply,
-            "input_tokens":  resp.usage.input_tokens,
-            "output_tokens": resp.usage.output_tokens,
-        }
-
-    except _anthropic.NotFoundError:
-        return {
-            "success": False,
-            "error": f"Modelo '{cfg.model}' não encontrado no {cfg.provider}.",
-            "error_type": "NotFoundError",
-            "hint": (
-                "Verifique se o ID do modelo está correto. "
-                "Exemplos válidos para OpenRouter: 'anthropic/claude-sonnet-4-5', "
-                "'openai/gpt-4o', 'meta-llama/llama-3.3-70b-instruct'."
-            ),
-            "provider": cfg.provider,
-            "model": cfg.model,
-        }
-
-    except _anthropic.AuthenticationError:
-        return {
-            "success": False,
-            "error": "API key inválida ou expirada.",
-            "error_type": "AuthenticationError",
-            "hint": (
-                "Verifique a chave no campo API Key. "
-                + ("Chaves OpenRouter começam com 'sk-or-v1-'. Gere uma nova em openrouter.ai/keys."
-                   if is_openrouter else
-                   "Chaves Anthropic começam com 'sk-ant-'. Verifique em console.anthropic.com.")
-            ),
-            "provider": cfg.provider,
-            "model": cfg.model,
-        }
-
-    except _anthropic.PermissionDeniedError:
-        return {
-            "success": False,
-            "error": "Sem permissão para usar este modelo.",
-            "error_type": "PermissionDeniedError",
-            "hint": (
-                "Sua conta pode não ter acesso a este modelo. "
-                + ("Verifique se tem créditos no OpenRouter (openrouter.ai/activity)."
-                   if is_openrouter else
-                   "Verifique os limites do seu plano Anthropic.")
-            ),
-            "provider": cfg.provider,
-            "model": cfg.model,
-        }
-
-    except _anthropic.RateLimitError:
-        return {
-            "success": False,
-            "error": "Limite de requisições atingido.",
-            "error_type": "RateLimitError",
-            "hint": "Aguarde alguns segundos e tente novamente. Se persistir, verifique seu saldo.",
-            "provider": cfg.provider,
-            "model": cfg.model,
-        }
-
-    except _anthropic.APITimeoutError:
-        return {
-            "success": False,
-            "error": "Timeout — proxy SSL corporativo provavelmente bloqueando a conexão.",
-            "error_type": "APITimeoutError",
-            "hint": (
-                "Em ambientes corporativos o firewall bloqueia conexões HTTPS externas. "
-                "Confirme que ANTHROPIC_SSL_VERIFY=false está no .env e reinicie o backend com 'make dev'."
-            ),
-            "provider": cfg.provider,
-            "model": cfg.model,
-        }
-
-    except _anthropic.APIConnectionError as e:
-        return {
-            "success": False,
-            "error": f"Não foi possível conectar: {str(e)[:120]}",
-            "error_type": "APIConnectionError",
-            "hint": (
-                "Proxy/firewall bloqueando a conexão. "
-                "Confirme que ANTHROPIC_SSL_VERIFY=false está no .env e reinicie o backend."
-            ),
-            "provider": cfg.provider,
-            "model": cfg.model,
-        }
+            from app.agent.llm_client import build_openrouter_client
+            client = build_openrouter_client(
+                api_key,
+                cfg.openrouter_base_url,
+                site_name=cfg.site_name,
+                site_url=cfg.site_url,
+            )
+            resp = await client.chat.completions.create(
+                model=cfg.model,
+                max_tokens=50,
+                messages=[{"role": "user", "content": "Responda apenas: OK"}],
+            )
+            reply = resp.choices[0].message.content or "" if resp.choices else ""
+            usage = resp.usage
+            return {
+                "success":       True,
+                "provider":      cfg.provider,
+                "model":         cfg.model,
+                "response":      reply,
+                "input_tokens":  usage.prompt_tokens     if usage else 0,
+                "output_tokens": usage.completion_tokens if usage else 0,
+            }
+        else:
+            from app.agent.llm_client import build_anthropic_client
+            import anthropic as _anthropic
+            client = build_anthropic_client(api_key)
+            resp = await client.messages.create(
+                model=cfg.model,
+                max_tokens=50,
+                messages=[{"role": "user", "content": "Responda apenas: OK"}],
+            )
+            reply = resp.content[0].text if resp.content else ""
+            return {
+                "success":       True,
+                "provider":      cfg.provider,
+                "model":         cfg.model,
+                "response":      reply,
+                "input_tokens":  resp.usage.input_tokens,
+                "output_tokens": resp.usage.output_tokens,
+            }
 
     except Exception as e:
         import re as _re
-        err_raw = str(e)
-        err_clean = _re.sub(r"<[^>]+>", " ", err_raw)
-        err_clean = _re.sub(r"\s{2,}", " ", err_clean).strip()[:200]
+        err_raw  = str(e)
+        err_type = type(e).__name__
+
+        # Detect error type by class name (works for both Anthropic and OpenAI SDKs)
+        err_lower = err_raw.lower()
+        if "notfound" in err_type.lower() or "404" in err_raw:
+            short = f"Modelo '{cfg.model}' não encontrado em {cfg.provider}."
+            hint  = ("Verifique o ID do modelo. OpenRouter usa formato 'provedor/modelo'. "
+                     "Consulte a lista completa em openrouter.ai/models")
+        elif "authentication" in err_type.lower() or "401" in err_raw or "invalid_api_key" in err_lower:
+            short = "API key inválida ou expirada."
+            hint  = ("Chaves OpenRouter começam com 'sk-or-v1-'. Gere em openrouter.ai/keys"
+                     if is_openrouter else "Verifique em console.anthropic.com")
+        elif "permission" in err_type.lower() or "403" in err_raw or "host not in allowlist" in err_lower:
+            short = "Sem permissão."
+            hint  = ("Adicione HTTP-Referer no campo Site URL do painel admin."
+                     if is_openrouter else "Verifique os limites do seu plano Anthropic.")
+        elif "ratelimit" in err_type.lower() or "429" in err_raw:
+            short = "Limite de requisições atingido."
+            hint  = "Aguarde alguns segundos e tente novamente."
+        elif "timeout" in err_type.lower() or "timeout" in err_lower:
+            short = "Timeout — proxy/firewall bloqueando a conexão."
+            hint  = "Confirme que ANTHROPIC_SSL_VERIFY=false está no .env e reinicie o backend."
+        elif "connection" in err_type.lower() or "ssl" in err_lower or "certificate" in err_lower:
+            short = "Erro de conexão ou SSL."
+            hint  = "Adicione ANTHROPIC_SSL_VERIFY=false no .env e reinicie o backend."
+        else:
+            err_clean = _re.sub(r"<[^>]+>", " ", err_raw)
+            err_clean = _re.sub(r"\s{2,}", " ", err_clean).strip()[:150]
+            short = err_clean
+            hint  = "Verifique API key, ID do modelo e configurações de rede."
+
         return {
             "success":    False,
-            "error":      err_clean,
-            "error_type": type(e).__name__,
-            "hint":       "Verifique API key, ID do modelo e configurações de rede.",
+            "error":      short,
+            "error_type": err_type,
+            "hint":       hint,
             "provider":   cfg.provider,
             "model":      cfg.model,
         }
