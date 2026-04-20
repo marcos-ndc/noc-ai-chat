@@ -1,36 +1,35 @@
 /**
  * useWakeWord — Modo hands-free estilo Alexa
  *
- * Clica em "Olá NOC" para entrar em standby.
- * Diz "Olá NOC" → ouve a pergunta → envia → aguarda resposta → ouve de novo.
- * Diz "NOC obrigado" (ou "tchau NOC", "pare NOC") para encerrar.
+ * Uma única sessão continuous=true que fica aberta o tempo todo.
+ * Analisa cada utterance e decide se é wake word, query ou stop word.
+ *
+ * Palavras de ativação:  "olá noc", "nokia", "hey noc" e variações pt-BR
+ * Palavras de parada:    "noc obrigado", "tchau noc", "pare noc"
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export type HandsFreeState =
   | 'off'       // desligado
-  | 'standby'   // ouvindo em background por wake word
-  | 'listening' // gravando pergunta
+  | 'standby'   // aguardando wake word
+  | 'listening' // pronto para receber pergunta
   | 'waiting'   // aguardando resposta do agente
-  | 'speaking'  // TTS reproduzindo — logo vai ouvir de novo
+  | 'speaking'  // TTS reproduzindo
 
+// Variações de como pt-BR transcreve "NOC"
 const WAKE_WORDS = [
-  // Pronúncias corretas
   'olá noc', 'ola noc', 'hey noc', 'ei noc', 'oi noc',
-  // Como o pt-BR reconhece "NOC" falado
-  'olá nokia', 'ola nokia', 'hey nokia',
+  'olá nokia', 'ola nokia', 'hey nokia', 'ei nokia',
+  'olá nok',  'ola nok',
   'olá knock', 'ola knock',
-  'olá nok', 'ola nok', 'hey nok',
-  'olá nóc', 'ola nóc',
+  'olá nóc',  'ola nóc',
   'olá noque', 'ola noque',
-  'olá norte', 'ola norte',  // às vezes reconhece "noc" como "norte"
-  // Só "noc" em qualquer posição (captura "ei, noc!", "noc!" etc)
-  ' noc ', 'nokia', 'nok ',
 ]
 const STOP_WORDS = [
-  'noc obrigado', 'tchau noc', 'pare noc', 'noc tchau', 'desligar',
-  'nokia obrigado', 'tchau nokia', 'pare nokia',
-  'nok obrigado', 'tchau nok',
+  'noc obrigado', 'nokia obrigado',
+  'tchau noc', 'tchau nokia',
+  'pare noc',  'pare nokia',
+  'obrigado noc', 'obrigado nokia',
 ]
 
 interface Options {
@@ -41,15 +40,14 @@ interface Options {
 }
 
 export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }: Options) {
-  const [state, setState] = useState<HandsFreeState>('off')
-
-  // All mutable state lives in refs so event listeners always see current values
-  const stateRef      = useRef<HandsFreeState>('off')
-  const recRef        = useRef<SpeechRecognition | null>(null)
-  const onQueryRef    = useRef(onQuery)
-  const timerRef      = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const agentRef      = useRef(agentState)
-  const ttsRef        = useRef(ttsState)
+  const [state, setState]     = useState<HandsFreeState>('off')
+  const stateRef              = useRef<HandsFreeState>('off')
+  const recRef                = useRef<SpeechRecognition | null>(null)
+  const onQueryRef            = useRef(onQuery)
+  const agentRef              = useRef(agentState)
+  const ttsRef                = useRef(ttsState)
+  const restartTimerRef       = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const activeRef             = useRef(false)   // true = hands-free is on
 
   useEffect(() => { onQueryRef.current = onQuery },    [onQuery])
   useEffect(() => { agentRef.current   = agentState }, [agentState])
@@ -63,147 +61,157 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
     setState(s)
   }, [])
 
-  const killRec = useCallback(() => {
-    if (recRef.current) {
-      const rec = recRef.current
-      recRef.current = null          // null FIRST so onend/onerror don't restart
-      try { rec.abort() } catch { /* ignore */ }
+  const clearTimer = useCallback(() => {
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current)
+      restartTimerRef.current = null
     }
   }, [])
 
-  const killTimer = useCallback(() => {
-    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
-  }, [])
+  // ── Start/restart continuous recognition ─────────────────────────────────
+  const startRef = useRef<() => void>(() => {})
 
-  // ── Core: start one recognition session ─────────────────────────────────
-  // Uses a ref so recursive restarts always call the latest version
-  const startRef = useRef<(mode: 'standby' | 'listening') => void>(() => {})
+  startRef.current = () => {
+    if (!isSupported || !activeRef.current) return
 
-  startRef.current = (mode: 'standby' | 'listening') => {
-    if (!isSupported) return
-    if (stateRef.current === 'off') return   // deactivated — stop recursion
+    // Don't start while TTS is speaking — Chrome will abort immediately
+    if (ttsRef.current === 'speaking') {
+      console.log('[WakeWord] TTS playing, will retry after it finishes')
+      return
+    }
 
-    killRec()
+    if (recRef.current) {
+      try { recRef.current.abort() } catch { /* ignore */ }
+      recRef.current = null
+    }
 
     const SR  = window.SpeechRecognition || window.webkitSpeechRecognition
     const rec = new SR()
     rec.lang           = 'pt-BR'
-    rec.continuous     = false       // one utterance at a time — more reliable
-    rec.interimResults = false       // final results only
+    rec.continuous     = true    // stay open across silences
+    rec.interimResults = false   // final results only — fewer false positives
     recRef.current     = rec
 
-    stateRef.current = mode
-    setState(mode)
+    rec.addEventListener('result', (e: SpeechRecognitionEvent) => {
+      // Process only the latest final result
+      const last = e.results[e.results.length - 1]
+      if (!last?.isFinal) return
+      const raw = last[0].transcript.toLowerCase().trim()
+      console.log('[WakeWord] heard:', raw, '| state:', stateRef.current)
 
-    rec.addEventListener("result", (e: SpeechRecognitionEvent) => {
-      const raw = Array.from(e.results)
-        .map(r => r[0].transcript.toLowerCase().trim())
-        .join(' ')
-
-      console.log('[WakeWord] heard:', raw, '| mode:', mode)
-
-      // Stop word always wins
+      // Stop word — always wins
       if (STOP_WORDS.some(w => raw.includes(w))) {
-        killRec()
+        console.log('[WakeWord] stop word detected → off')
+        activeRef.current = false
+        if (recRef.current) { recRef.current.abort(); recRef.current = null }
         set('off')
         return
       }
 
-      if (mode === 'standby') {
-        const hit = WAKE_WORDS.some(w => raw.includes(w))
-        if (!hit) {
-          // Not a wake word — restart standby
-          setTimeout(() => startRef.current('standby'), 100)
-          return
-        }
+      if (stateRef.current === 'standby') {
+        const isWake = WAKE_WORDS.some(w => raw.includes(w))
+        if (!isWake) return   // ignore non-wake words in standby
 
-        // Strip wake word to get optional inline question
+        // Strip wake word from query (in case both spoken together)
         let query = raw
-        for (const w of WAKE_WORDS) query = query.replace(w, '').trim()
+        for (const w of [...WAKE_WORDS]) query = query.replace(w, '').trim()
 
         if (query.length > 2) {
+          console.log('[WakeWord] wake + query:', query)
           set('waiting')
           onQueryRef.current(query)
         } else {
-          // Just the wake word — now listen for the question
-          setTimeout(() => startRef.current('listening'), 200)
+          console.log('[WakeWord] wake word → now listening')
+          set('listening')
         }
-      } else {
-        // listening mode — any speech is the question
-        const cleaned = raw
-          .replace(/(olá noc|ola noc|hey noc|oi noc|ei noc)/gi, '')
-          .trim()
 
+      } else if (stateRef.current === 'listening') {
+        // Any speech that's not a stop word is the question
+        const cleaned = raw
+          .replace(/(olá noc|ola noc|hey noc|oi noc|ei noc|olá nokia|ola nokia)/gi, '')
+          .trim()
         if (cleaned.length > 1) {
+          console.log('[WakeWord] query:', cleaned)
           set('waiting')
           onQueryRef.current(cleaned)
-        } else {
-          setTimeout(() => startRef.current('listening'), 100)
         }
       }
     })
 
-    rec.addEventListener("error", (e: SpeechRecognitionErrorEvent) => {
-      console.log('[WakeWord] error:', e.error)
-      if (stateRef.current === 'off') return
-      // no-speech and aborted are normal — just restart
-      setTimeout(() => {
-        if (stateRef.current !== 'off' && stateRef.current !== 'waiting') {
-          startRef.current(stateRef.current as 'standby' | 'listening')
-        }
-      }, 300)
+    rec.addEventListener('error', (e: SpeechRecognitionErrorEvent) => {
+      console.log('[WakeWord] error:', e.error, '| state:', stateRef.current)
+      if (!activeRef.current) return
+      if (e.error === 'not-allowed') { activeRef.current = false; set('off'); return }
+      // aborted/network/no-speech → onend will restart
     })
 
-    rec.addEventListener("end", () => {
-      console.log('[WakeWord] session ended, state:', stateRef.current)
-      if (stateRef.current === 'off' || stateRef.current === 'waiting') return
-      if (stateRef.current === 'standby' || stateRef.current === 'listening') {
-        setTimeout(() => {
-          if (stateRef.current !== 'off' && stateRef.current !== 'waiting') {
-            startRef.current(stateRef.current as 'standby' | 'listening')
-          }
-        }, 150)
-      }
+    rec.addEventListener('end', () => {
+      console.log('[WakeWord] session ended | active:', activeRef.current, '| state:', stateRef.current)
+      if (!activeRef.current) return
+      if (stateRef.current === 'waiting' || stateRef.current === 'speaking') return
+
+      // Restart continuous session after short delay
+      clearTimer()
+      restartTimerRef.current = setTimeout(() => {
+        if (activeRef.current) startRef.current()
+      }, 500)
     })
 
     try {
       rec.start()
-      console.log('[WakeWord] session started, mode:', mode)
+      console.log('[WakeWord] continuous session started, state:', stateRef.current)
     } catch (err) {
       console.warn('[WakeWord] failed to start:', err)
+      restartTimerRef.current = setTimeout(() => {
+        if (activeRef.current) startRef.current()
+      }, 1000)
     }
   }
 
-  // ── After agent + TTS finish → restart listening ─────────────────────────
+  // ── After agent responds + TTS finishes → go back to listening ───────────
   useEffect(() => {
+    if (!activeRef.current) return
     if (stateRef.current !== 'waiting' && stateRef.current !== 'speaking') return
-    if (agentState !== 'idle') return
-    if (ttsState !== 'idle') {
-      // TTS started — mark as speaking
-      if (ttsState === 'speaking') set('speaking')
+
+    if (ttsState === 'speaking') {
+      set('speaking')
       return
     }
-    // Both done → listen again after short delay
-    killTimer()
-    timerRef.current = setTimeout(() => {
-      if (stateRef.current !== 'off') startRef.current('listening')
-    }, 900)
-  }, [agentState, ttsState, set, killTimer])
+
+    if (agentState === 'idle' && ttsState === 'idle') {
+      console.log('[WakeWord] agent done → back to listening')
+      clearTimer()
+      set('listening')
+      // Restart recognition after TTS finishes (Chrome needs a moment)
+      restartTimerRef.current = setTimeout(() => {
+        if (activeRef.current) startRef.current()
+      }, 1200)
+    }
+  }, [agentState, ttsState, set, clearTimer])
 
   // ── Public API ────────────────────────────────────────────────────────────
   const activate = useCallback(() => {
     if (!isSupported || disabled) return
+    activeRef.current = true
     set('standby')
-    setTimeout(() => startRef.current('standby'), 50)
+    setTimeout(() => startRef.current(), 100)
   }, [isSupported, disabled, set])
 
   const deactivate = useCallback(() => {
-    killTimer()
-    killRec()
+    activeRef.current = false
+    clearTimer()
+    if (recRef.current) {
+      try { recRef.current.abort() } catch { /* ignore */ }
+      recRef.current = null
+    }
     set('off')
-  }, [killTimer, killRec, set])
+  }, [clearTimer, set])
 
-  useEffect(() => () => { killTimer(); killRec() }, [killTimer, killRec])
+  useEffect(() => () => {
+    activeRef.current = false
+    clearTimer()
+    if (recRef.current) { try { recRef.current.abort() } catch { /* ignore */ } }
+  }, [clearTimer])
 
   return { state, activate, deactivate, isSupported }
 }
