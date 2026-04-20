@@ -5,6 +5,7 @@ import { ChatInput } from '../components/Chat/ChatInput'
 import { StatusIndicator } from '../components/StatusIndicator/StatusIndicator'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useVoiceOutput } from '../hooks/useVoiceOutput'
+import { useWakeWord } from '../hooks/useWakeWord'
 import { useAuth, useAuthStore } from '../hooks/useAuth'
 import type { Message, ToolName, WSEvent } from '../types'
 
@@ -146,6 +147,16 @@ export function ChatPage() {
     autoReconnect: !!wsUrl,
   })
 
+  // Hands-free: wake word loop (needs isConnected)
+  const wakeWord = useWakeWord({
+    onQuery:    (text) => handleSend(text, true),
+    agentState: isAgentTyping ? 'typing' : 'idle',
+    ttsState:   voiceOutput.state === 'speaking' ? 'speaking'
+              : voiceOutput.state === 'paused'   ? 'paused'
+              : 'idle',
+    disabled: !isConnected,
+  })
+
   // Auto-scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -174,7 +185,7 @@ export function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen noc-grid scanlines">
-      <Header user={user} isConnected={isConnected} onLogout={logout} voiceMode={voiceMode} />
+      <Header user={user} isConnected={isConnected} onLogout={logout} voiceMode={voiceMode} handsFreeState={wakeWord.state} />
 
       {/* Messages area */}
       <main className="flex-1 overflow-y-auto py-4 space-y-1">
@@ -186,6 +197,23 @@ export function ChatPage() {
 
         <div ref={bottomRef} />
       </main>
+
+      {/* Hands-free banner */}
+      {wakeWord.state !== 'off' && (
+        <div className="flex items-center justify-between px-4 py-2 bg-noc-accent/10 border-t border-noc-accent/20">
+          <div className="flex items-center gap-2 text-xs font-mono text-noc-accent">
+            <span className={`w-2 h-2 rounded-full bg-noc-accent ${wakeWord.state === 'listening' ? 'animate-ping' : 'animate-pulse'}`} />
+            {wakeWord.state === 'standby'  && <>👂 Aguardando... diga &ldquo;Olá NOC&rdquo;</>}
+            {wakeWord.state === 'listening' && <>🎙️ Ouvindo sua pergunta...</>}
+            {wakeWord.state === 'waiting'  && <>⏳ Processando...</>}
+            {wakeWord.state === 'speaking' && <>🔊 Respondendo...</>}
+          </div>
+          <button type="button" onClick={wakeWord.deactivate}
+            className="text-[10px] font-mono text-noc-muted hover:text-noc-danger transition-colors px-2 py-1 rounded border border-noc-border/40">
+            Encerrar modo voz
+          </button>
+        </div>
+      )}
 
       {/* Input area */}
       <ChatInput
@@ -200,6 +228,9 @@ export function ChatPage() {
           setVoiceOutputEnabled(v => !v)
         }}
         onVoiceOutputStop={voiceOutput.stop}
+        handsFreeActive={wakeWord.state !== 'off'}
+        handsFreeSupported={wakeWord.isSupported}
+        onHandsFreeToggle={() => wakeWord.state !== 'off' ? wakeWord.deactivate() : wakeWord.activate()}
         placeholder={
           !isConnected
             ? 'Aguardando conexão...'
