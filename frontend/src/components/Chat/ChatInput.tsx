@@ -34,9 +34,20 @@ export function ChatInput({
 
   const voiceInput = useVoiceInput({
     onResult: (transcript) => {
+      if (!transcript.trim()) return
       fromVoiceRef.current = true
       setValue(transcript)
-      textareaRef.current?.focus()
+      // Auto-send: submit immediately when voice recognition completes
+      // Use setTimeout to let React flush setValue before reading it in handleSend
+      setTimeout(() => {
+        const trimmed = transcript.trim()
+        if (trimmed && onVoiceSend) {
+          onVoiceSend(trimmed)
+          fromVoiceRef.current = false
+          setValue('')
+          if (textareaRef.current) textareaRef.current.style.height = 'auto'
+        }
+      }, 50)
     },
   })
 

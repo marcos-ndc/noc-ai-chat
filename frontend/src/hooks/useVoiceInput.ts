@@ -51,6 +51,8 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}): UseVoiceInput
 
     recognition.addEventListener('end', () => {
       setState('idle')
+      // Also fire onResult on natural end (not just manual stop)
+      if (transcriptRef.current) onResult?.(transcriptRef.current)
     })
 
     recognition.start()

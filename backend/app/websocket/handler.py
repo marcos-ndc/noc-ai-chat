@@ -111,6 +111,7 @@ async def handle_chat_websocket(ws: WebSocket) -> None:
                 session_id=session_id,
                 user_id=user.id,
                 content_length=len(inbound.content),
+                voice_mode=inbound.voiceMode,
             )
 
             # Stream agent response

@@ -179,7 +179,8 @@ O usuário está OUVINDO sua resposta, não lendo. Aplique TODAS as regras abaix
 
 
 def get_system_prompt(profile: UserProfile, voice_mode: bool = False) -> str:
-    prompt = _BASE_PROMPT + _PROFILE_ADDENDUM.get(profile, "")
     if voice_mode:
-        prompt += _VOICE_ADDENDUM
-    return prompt
+        # Voice addendum goes FIRST so it takes absolute priority
+        # over any default formatting instructions in the base prompt
+        return _VOICE_ADDENDUM + _BASE_PROMPT + _PROFILE_ADDENDUM.get(profile, "")
+    return _BASE_PROMPT + _PROFILE_ADDENDUM.get(profile, "")
