@@ -143,9 +143,14 @@ class AgentOrchestrator:
         import httpx, os
         ca_cert    = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
         is_openrouter = bool(base_url and "openrouter" in base_url)
-        # For OpenRouter, also check OPENROUTER_SSL_VERIFY (falls back to ANTHROPIC_SSL_VERIFY)
-        ssl_env = "OPENROUTER_SSL_VERIFY" if is_openrouter else "ANTHROPIC_SSL_VERIFY"
-        ssl_verify = os.environ.get(ssl_env, os.environ.get("ANTHROPIC_SSL_VERIFY", "true")).lower() != "false"
+        # SSL verify:
+        # - OpenRouter: default FALSE (external service, corporate proxies block it)
+        # - Anthropic: reads ANTHROPIC_SSL_VERIFY (default depends on env)
+        if is_openrouter:
+            ssl_verify = os.environ.get("OPENROUTER_SSL_VERIFY",
+                         os.environ.get("ANTHROPIC_SSL_VERIFY", "false")).lower() != "false"
+        else:
+            ssl_verify = os.environ.get("ANTHROPIC_SSL_VERIFY", "true").lower() != "false"
 
         # OpenRouter pode ser mais lento (roteamento externo) — timeout maior
         timeout = httpx.Timeout(120.0, connect=30.0) if is_openrouter else httpx.Timeout(60.0, connect=15.0)
