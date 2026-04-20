@@ -161,4 +161,5 @@ export interface TestResult {
   output_tokens?: number
   error?:         string
   error_type?:    string
+  hint?:          string
 }

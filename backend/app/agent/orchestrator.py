@@ -142,18 +142,26 @@ class AgentOrchestrator:
     def _build_client(self, api_key: str, base_url: Optional[str] = None) -> AsyncAnthropic:
         import httpx, os
         ca_cert    = os.environ.get("REQUESTS_CA_BUNDLE") or os.environ.get("SSL_CERT_FILE")
-        ssl_verify = os.environ.get("ANTHROPIC_SSL_VERIFY", "true").lower() != "false"
+        is_openrouter = bool(base_url and "openrouter" in base_url)
+        # For OpenRouter, also check OPENROUTER_SSL_VERIFY (falls back to ANTHROPIC_SSL_VERIFY)
+        ssl_env = "OPENROUTER_SSL_VERIFY" if is_openrouter else "ANTHROPIC_SSL_VERIFY"
+        ssl_verify = os.environ.get(ssl_env, os.environ.get("ANTHROPIC_SSL_VERIFY", "true")).lower() != "false"
+
+        # OpenRouter pode ser mais lento (roteamento externo) — timeout maior
+        timeout = httpx.Timeout(120.0, connect=30.0) if is_openrouter else httpx.Timeout(60.0, connect=15.0)
 
         kwargs: dict = {"api_key": api_key}
         if base_url:
             kwargs["base_url"] = base_url
 
         if ca_cert:
-            kwargs["http_client"] = httpx.AsyncClient(verify=ca_cert)
+            kwargs["http_client"] = httpx.AsyncClient(verify=ca_cert, timeout=timeout)
         elif not ssl_verify:
             import warnings
-            warnings.warn("SSL verification disabled for Anthropic API")
-            kwargs["http_client"] = httpx.AsyncClient(verify=False)
+            warnings.warn("SSL verification disabled for Anthropic/OpenRouter API")
+            kwargs["http_client"] = httpx.AsyncClient(verify=False, timeout=timeout)
+        else:
+            kwargs["http_client"] = httpx.AsyncClient(timeout=timeout)
 
         return AsyncAnthropic(**kwargs)
     @property

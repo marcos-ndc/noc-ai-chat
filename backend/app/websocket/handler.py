@@ -134,15 +134,33 @@ async def handle_chat_websocket(ws: WebSocket) -> None:
                     session_id=session_id,
                 )
                 # Build user-friendly message based on error type
+                # Detect provider from config for better messages
+                try:
+                    from app.agent.ai_config import ai_config_store
+                    _cfg = await ai_config_store.get()
+                    _provider = _cfg.provider.value
+                    _model    = _cfg.model
+                except Exception:
+                    _provider = "anthropic"
+                    _model    = "?"
+
+                provider_label = f"{_provider} ({_model})"
                 error_msg = error_detail
-                if "ANTHROPIC_API_KEY" in error_msg or "authentication" in error_msg.lower():
-                    error_msg = "⚠️ ANTHROPIC_API_KEY inválida ou não configurada."
-                elif "SSL" in error_msg or "certificate" in error_msg.lower():
-                    error_msg = "⚠️ Erro de certificado SSL. Verifique o proxy corporativo (veja docs/CORPORATE-PROXY.md)."
-                elif "Connection error" in error_msg or "ConnectError" in error_type:
-                    error_msg = f"⚠️ Erro de conexão com api.anthropic.com. Possível bloqueio de proxy/firewall. Detalhe: {error_detail}"
-                elif "timeout" in error_msg.lower() or "Timeout" in error_type:
-                    error_msg = "⚠️ Timeout na API Anthropic. Tente novamente."
+
+                if "401" in error_msg or "403" in error_msg or "authentication" in error_msg.lower() or "API_KEY" in error_msg:
+                    error_msg = f"⚠️ API key inválida para {_provider}. Verifique a chave no painel /admin."
+                elif "SSL" in error_msg or "certificate" in error_msg.lower() or "CERTIFICATE" in error_msg:
+                    error_msg = f"⚠️ Erro SSL ao conectar em {_provider}. Adicione SSL_VERIFY=false no .env (proxy corporativo)."
+                elif "timeout" in error_msg.lower() or "Timeout" in error_type or "ReadTimeout" in error_type:
+                    error_msg = f"⚠️ Timeout ao chamar {provider_label}. O modelo pode estar sobrecarregado. Tente novamente ou escolha outro modelo no painel /admin."
+                elif "Connection" in error_msg or "ConnectError" in error_type or "connect" in error_msg.lower():
+                    error_msg = f"⚠️ Não foi possível conectar a {_provider}. Verifique se o proxy/firewall permite acesso. Detalhe: {error_detail[:120]}"
+                elif "not_found" in error_msg or "404" in error_msg or "model" in error_msg.lower():
+                    error_msg = f"⚠️ Modelo '{_model}' não encontrado em {_provider}. Verifique o ID do modelo no painel /admin."
+                elif "insufficient_quota" in error_msg or "quota" in error_msg.lower() or "429" in error_msg:
+                    error_msg = f"⚠️ Limite de uso atingido em {_provider}. Verifique seu saldo/cota."
+                else:
+                    error_msg = f"⚠️ Erro em {provider_label}: {error_detail[:200]}"
                 await manager.send(connection_id, WSOutbound(
                     type=WSEventType.error,
                     error=error_msg,
