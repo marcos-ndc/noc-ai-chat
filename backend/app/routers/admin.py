@@ -122,12 +122,13 @@ async def test_ai_config(
 
     is_openrouter = cfg.provider == AIProvider.openrouter
     try:
+        import anthropic as _anthropic
         client = orchestrator._build_client(
             api_key,
             cfg.openrouter_base_url if is_openrouter else None,
         )
         extra: dict = {}
-        if cfg.provider == AIProvider.openrouter:
+        if is_openrouter:
             if cfg.site_url:  extra["HTTP-Referer"] = cfg.site_url
             if cfg.site_name: extra["X-Title"] = cfg.site_name
 
@@ -146,57 +147,97 @@ async def test_ai_config(
             "input_tokens":  resp.usage.input_tokens,
             "output_tokens": resp.usage.output_tokens,
         }
+
+    except _anthropic.NotFoundError:
+        return {
+            "success": False,
+            "error": f"Modelo '{cfg.model}' não encontrado no {cfg.provider}.",
+            "error_type": "NotFoundError",
+            "hint": (
+                "Verifique se o ID do modelo está correto. "
+                "Exemplos válidos para OpenRouter: 'anthropic/claude-sonnet-4-5', "
+                "'openai/gpt-4o', 'meta-llama/llama-3.3-70b-instruct'."
+            ),
+            "provider": cfg.provider,
+            "model": cfg.model,
+        }
+
+    except _anthropic.AuthenticationError:
+        return {
+            "success": False,
+            "error": "API key inválida ou expirada.",
+            "error_type": "AuthenticationError",
+            "hint": (
+                "Verifique a chave no campo API Key. "
+                + ("Chaves OpenRouter começam com 'sk-or-v1-'. Gere uma nova em openrouter.ai/keys."
+                   if is_openrouter else
+                   "Chaves Anthropic começam com 'sk-ant-'. Verifique em console.anthropic.com.")
+            ),
+            "provider": cfg.provider,
+            "model": cfg.model,
+        }
+
+    except _anthropic.PermissionDeniedError:
+        return {
+            "success": False,
+            "error": "Sem permissão para usar este modelo.",
+            "error_type": "PermissionDeniedError",
+            "hint": (
+                "Sua conta pode não ter acesso a este modelo. "
+                + ("Verifique se tem créditos no OpenRouter (openrouter.ai/activity)."
+                   if is_openrouter else
+                   "Verifique os limites do seu plano Anthropic.")
+            ),
+            "provider": cfg.provider,
+            "model": cfg.model,
+        }
+
+    except _anthropic.RateLimitError:
+        return {
+            "success": False,
+            "error": "Limite de requisições atingido.",
+            "error_type": "RateLimitError",
+            "hint": "Aguarde alguns segundos e tente novamente. Se persistir, verifique seu saldo.",
+            "provider": cfg.provider,
+            "model": cfg.model,
+        }
+
+    except _anthropic.APITimeoutError:
+        return {
+            "success": False,
+            "error": "Timeout — proxy SSL corporativo provavelmente bloqueando a conexão.",
+            "error_type": "APITimeoutError",
+            "hint": (
+                "Em ambientes corporativos o firewall bloqueia conexões HTTPS externas. "
+                "Confirme que ANTHROPIC_SSL_VERIFY=false está no .env e reinicie o backend com 'make dev'."
+            ),
+            "provider": cfg.provider,
+            "model": cfg.model,
+        }
+
+    except _anthropic.APIConnectionError as e:
+        return {
+            "success": False,
+            "error": f"Não foi possível conectar: {str(e)[:120]}",
+            "error_type": "APIConnectionError",
+            "hint": (
+                "Proxy/firewall bloqueando a conexão. "
+                "Confirme que ANTHROPIC_SSL_VERIFY=false está no .env e reinicie o backend."
+            ),
+            "provider": cfg.provider,
+            "model": cfg.model,
+        }
+
     except Exception as e:
         import re as _re
         err_raw = str(e)
-
-        # Strip HTML from error message (CDN/WAF pages, CloudFlare, etc.)
-        err_clean = _re.sub(r"<[^>]+>", " ", err_raw)  # remove HTML tags
-        err_clean = _re.sub(r"\s{2,}", " ", err_clean).strip()  # collapse whitespace
-        err_clean = err_clean[:300]  # cap length
-
-        # Extract HTTP status code if present
-        status_match = _re.search(r"\b(\d{3})\b", err_raw)
-        status_code   = status_match.group(1) if status_match else ""
-
-        # Give actionable diagnosis
-        if status_code in ("401", "403") or "authentication" in err_raw.lower() or "invalid_api_key" in err_raw:
-            hint = "API key inválida ou sem permissão para este modelo."
-            short = f"HTTP {status_code} — API key inválida"
-        elif status_code in ("402",):
-            hint = "Saldo insuficiente no OpenRouter. Adicione créditos em openrouter.ai."
-            short = "HTTP 402 — sem saldo"
-        elif status_code in ("404",) or "not_found" in err_raw or "no endpoints" in err_raw.lower():
-            hint = f"Modelo '{cfg.model}' não encontrado ou indisponível neste provedor."
-            short = f"HTTP 404 — modelo não encontrado"
-        elif status_code in ("429",) or "quota" in err_raw.lower() or "rate_limit" in err_raw:
-            hint = "Limite de requisições atingido. Aguarde e tente novamente."
-            short = "HTTP 429 — rate limit"
-        elif status_code in ("500", "502", "503", "504"):
-            hint = f"Erro no servidor do provedor (HTTP {status_code}). Tente novamente em instantes."
-            short = f"HTTP {status_code} — erro no servidor"
-        elif "timeout" in err_raw.lower() or "Timeout" in type(e).__name__:
-            if is_openrouter:
-                hint = "Proxy/firewall bloqueando openrouter.ai. Verifique se ANTHROPIC_SSL_VERIFY=false está no .env e reinicie o backend."
-                short = "Timeout — possível bloqueio de proxy SSL corporativo"
-            else:
-                hint = "Proxy/firewall bloqueando api.anthropic.com. Verifique se ANTHROPIC_SSL_VERIFY=false está no .env."
-                short = "Timeout — possível bloqueio de proxy SSL corporativo"
-        elif "SSL" in err_raw or "certificate" in err_raw.lower() or "CERTIFICATE" in err_raw:
-            hint = "Erro SSL. Adicione OPENROUTER_SSL_VERIFY=false no .env (proxy corporativo)."
-            short = "Erro de certificado SSL"
-        elif "connect" in err_raw.lower() or "ConnectError" in type(e).__name__:
-            hint = "Não foi possível conectar. Proxy/firewall bloqueando? Adicione SSL_VERIFY=false no .env."
-            short = "Erro de conexão"
-        else:
-            hint = "Verifique API key, ID do modelo e configurações de rede no painel admin."
-            short = err_clean[:120]
-
+        err_clean = _re.sub(r"<[^>]+>", " ", err_raw)
+        err_clean = _re.sub(r"\s{2,}", " ", err_clean).strip()[:200]
         return {
             "success":    False,
-            "error":      short,          # short clean message for display
+            "error":      err_clean,
             "error_type": type(e).__name__,
-            "hint":       hint,
+            "hint":       "Verifique API key, ID do modelo e configurações de rede.",
             "provider":   cfg.provider,
             "model":      cfg.model,
         }
