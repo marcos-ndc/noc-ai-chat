@@ -145,9 +145,13 @@ async def handle_chat_websocket(ws: WebSocket) -> None:
                     _model    = "?"
 
                 provider_label = f"{_provider} ({_model})"
-                error_msg = error_detail
+                # Strip HTML tags from error (CDN/WAF error pages)
+                import re as _re
+                error_clean = _re.sub(r"<[^>]+>", " ", error_detail)
+                error_clean = _re.sub(r"\s{2,}", " ", error_clean).strip()[:200]
+                error_msg = error_clean
 
-                if "401" in error_msg or "403" in error_msg or "authentication" in error_msg.lower() or "API_KEY" in error_msg:
+                if "401" in error_detail or "403" in error_detail or "authentication" in error_detail.lower() or "API_KEY" in error_detail:
                     error_msg = f"⚠️ API key inválida para {_provider}. Verifique a chave no painel /admin."
                 elif "SSL" in error_msg or "certificate" in error_msg.lower() or "CERTIFICATE" in error_msg:
                     error_msg = f"⚠️ Erro SSL ao conectar em {_provider}. Adicione SSL_VERIFY=false no .env (proxy corporativo)."

@@ -146,27 +146,54 @@ async def test_ai_config(
             "output_tokens": resp.usage.output_tokens,
         }
     except Exception as e:
-        err = str(e)
+        import re as _re
+        err_raw = str(e)
+
+        # Strip HTML from error message (CDN/WAF pages, CloudFlare, etc.)
+        err_clean = _re.sub(r"<[^>]+>", " ", err_raw)  # remove HTML tags
+        err_clean = _re.sub(r"\s{2,}", " ", err_clean).strip()  # collapse whitespace
+        err_clean = err_clean[:300]  # cap length
+
+        # Extract HTTP status code if present
+        status_match = _re.search(r"\b(\d{3})\b", err_raw)
+        status_code   = status_match.group(1) if status_match else ""
+
         # Give actionable diagnosis
-        if "401" in err or "403" in err or "authentication" in err.lower():
+        if status_code in ("401", "403") or "authentication" in err_raw.lower() or "invalid_api_key" in err_raw:
             hint = "API key inválida ou sem permissão para este modelo."
-        elif "timeout" in err.lower() or "Timeout" in type(e).__name__:
-            hint = "Timeout — modelo pode estar sobrecarregado. Tente outro modelo."
-        elif "SSL" in err or "certificate" in err.lower():
-            hint = "Erro SSL. Adicione OPENROUTER_SSL_VERIFY=false (ou ANTHROPIC_SSL_VERIFY=false) no .env."
-        elif "connect" in err.lower() or "ConnectError" in type(e).__name__:
-            hint = "Não foi possível conectar. Proxy/firewall bloqueando? Verifique SSL_VERIFY no .env."
-        elif "not_found" in err or "model" in err.lower():
-            hint = f"Modelo '{cfg.model}' não encontrado. Verifique o ID do modelo."
+            short = f"HTTP {status_code} — API key inválida"
+        elif status_code in ("402",):
+            hint = "Saldo insuficiente no OpenRouter. Adicione créditos em openrouter.ai."
+            short = "HTTP 402 — sem saldo"
+        elif status_code in ("404",) or "not_found" in err_raw or "no endpoints" in err_raw.lower():
+            hint = f"Modelo '{cfg.model}' não encontrado ou indisponível neste provedor."
+            short = f"HTTP 404 — modelo não encontrado"
+        elif status_code in ("429",) or "quota" in err_raw.lower() or "rate_limit" in err_raw:
+            hint = "Limite de requisições atingido. Aguarde e tente novamente."
+            short = "HTTP 429 — rate limit"
+        elif status_code in ("500", "502", "503", "504"):
+            hint = f"Erro no servidor do provedor (HTTP {status_code}). Tente novamente em instantes."
+            short = f"HTTP {status_code} — erro no servidor"
+        elif "timeout" in err_raw.lower() or "Timeout" in type(e).__name__:
+            hint = "Timeout — modelo sobrecarregado ou rede lenta. Tente novamente ou escolha outro modelo."
+            short = "Timeout na conexão"
+        elif "SSL" in err_raw or "certificate" in err_raw.lower() or "CERTIFICATE" in err_raw:
+            hint = "Erro SSL. Adicione OPENROUTER_SSL_VERIFY=false no .env (proxy corporativo)."
+            short = "Erro de certificado SSL"
+        elif "connect" in err_raw.lower() or "ConnectError" in type(e).__name__:
+            hint = "Não foi possível conectar. Proxy/firewall bloqueando? Adicione SSL_VERIFY=false no .env."
+            short = "Erro de conexão"
         else:
-            hint = "Verifique API key, modelo e configurações de rede."
+            hint = "Verifique API key, ID do modelo e configurações de rede no painel admin."
+            short = err_clean[:120]
+
         return {
-            "success": False,
-            "error": err,
+            "success":    False,
+            "error":      short,          # short clean message for display
             "error_type": type(e).__name__,
-            "hint": hint,
-            "provider": cfg.provider,
-            "model": cfg.model,
+            "hint":       hint,
+            "provider":   cfg.provider,
+            "model":      cfg.model,
         }
 
 
