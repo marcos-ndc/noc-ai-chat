@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import type { HandsFreeState } from '../../hooks/useWakeWord'
 import type { User } from '../../types'
 
 interface HeaderProps {
@@ -6,6 +7,7 @@ interface HeaderProps {
   isConnected: boolean
   onLogout: () => void
   voiceMode?: boolean
+  handsFreeState?: HandsFreeState
 }
 
 const profileLabel: Record<string, string> = {
@@ -16,7 +18,7 @@ const profileLabel: Record<string, string> = {
   admin:    'Administrador',
 }
 
-export function Header({ user, isConnected, onLogout, voiceMode = false }: HeaderProps) {
+export function Header({ user, isConnected, onLogout, voiceMode = false, handsFreeState = 'off' }: HeaderProps) {
   const navigate = useNavigate()
   const isAdmin  = user?.profile === 'admin'
 
@@ -45,6 +47,13 @@ export function Header({ user, isConnected, onLogout, voiceMode = false }: Heade
               ? <span className="text-noc-success">● online</span>
               : <span className="text-noc-danger">● reconectando...</span>}
             {voiceMode && <span className="text-noc-accent animate-pulse">🎙️ voz</span>}
+            {handsFreeState !== 'off' && (
+              <span className="text-noc-accent2 font-bold animate-pulse">
+                {handsFreeState === 'standby'  ? '👂 standby' :
+                 handsFreeState === 'listening' ? '🎙️ ouvindo' :
+                 handsFreeState === 'speaking'  ? '🔊 falando' : '⏳ proc.'}
+              </span>
+            )}
           </p>
         </div>
       </div>

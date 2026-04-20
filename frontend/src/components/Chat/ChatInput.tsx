@@ -11,6 +11,9 @@ interface ChatInputProps {
   voiceOutputState?: VoiceOutputState
   voiceOutputEnabled?: boolean
   voiceOutputIsPremium?: boolean
+  handsFreeActive?: boolean
+  handsFreeSupported?: boolean
+  onHandsFreeToggle?: () => void
   onVoiceOutputToggle?: () => void
   onVoiceOutputStop?: () => void
   placeholder?: string
@@ -23,6 +26,9 @@ export function ChatInput({
   voiceOutputState = 'idle',
   voiceOutputEnabled = false,
   voiceOutputIsPremium = false,
+  handsFreeActive = false,
+  handsFreeSupported = false,
+  onHandsFreeToggle,
   onVoiceOutputToggle,
   onVoiceOutputStop,
   placeholder = 'Pergunte sobre incidentes, alertas, métricas...',
@@ -120,6 +126,25 @@ export function ChatInput({
               ${value ? 'border-noc-border/80' : 'border-noc-border/40'}
             `}
           />
+
+          {/* Hands-free button */}
+          {handsFreeSupported && onHandsFreeToggle && (
+            <button
+              type="button"
+              onClick={onHandsFreeToggle}
+              title={handsFreeActive ? 'Diga "NOC obrigado" para parar' : 'Ativar modo voz — diga "Ol\u00e1 NOC"'}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-mono transition-all duration-200 ${
+                handsFreeActive
+                  ? 'bg-noc-accent/15 border-noc-accent text-noc-accent'
+                  : 'border-noc-border/60 text-noc-muted hover:border-noc-accent/40 hover:text-noc-accent'
+              }`}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className={`w-3.5 h-3.5 ${handsFreeActive ? 'animate-pulse' : ''}`}>
+                <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V6zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-2.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+              </svg>
+              <span>{handsFreeActive ? 'Voz ON' : 'Ol\u00e1 NOC'}</span>
+            </button>
+          )}
 
           {/* Send button inside textarea */}
           <button
