@@ -126,8 +126,28 @@ export function LoginPage() {
           </form>
         </div>
 
+        {/* Quick login hints */}
+        <div className="mt-4 space-y-1.5">
+          {[
+            { email: 'admin-sys@noc.local', pass: 'admin-noc-2024', label: 'Admin', badge: '⚙️' },
+            { email: 'gestor@noc.local',    pass: 'mgr2024',         label: 'Gestor', badge: '👔' },
+            { email: 'n1@noc.local',        pass: 'noc2024',         label: 'N1',     badge: '🟢' },
+          ].map(u => (
+            <button
+              key={u.email}
+              type="button"
+              onClick={() => { setEmail(u.email); setPassword(u.pass) }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg border border-noc-border/40 text-noc-muted hover:border-noc-border hover:text-noc-text transition-all text-[10px] font-mono"
+            >
+              <span>{u.badge}</span>
+              <span className="font-semibold">{u.label}</span>
+              <span className="text-noc-muted/60">{u.email}</span>
+            </button>
+          ))}
+        </div>
+
         {/* Footer */}
-        <p className="text-center text-[10px] text-noc-muted font-mono mt-6">
+        <p className="text-center text-[10px] text-noc-muted font-mono mt-4">
           NOC AI Chat · Agente especializado em monitoramento
         </p>
       </div>
