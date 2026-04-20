@@ -193,7 +193,8 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
   const activate = useCallback(() => {
     if (!isSupported || disabled) return
     activeRef.current = true
-    set('standby')
+    // Button click → go straight to listening (skip standby wake word requirement)
+    set('listening')
     setTimeout(() => startRef.current(), 100)
   }, [isSupported, disabled, set])
 

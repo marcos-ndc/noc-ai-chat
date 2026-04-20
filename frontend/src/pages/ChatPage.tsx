@@ -112,7 +112,7 @@ export function ChatPage() {
             m.id === msgId ? { ...m, status: 'done' as const } : m
           )
           // TTS automático: fala se voiceOutput ativo OU se veio de interação por voz
-          if ((voiceOutputEnabled || voiceMode) && msgId) {
+          if ((voiceOutputEnabled || voiceMode || wakeWord.state !== 'off') && msgId) {
             const doneMsg = updated.find(m => m.id === msgId)
             if (doneMsg) {
               const plainText = stripForVoice(doneMsg.content)
@@ -156,6 +156,13 @@ export function ChatPage() {
               : 'idle',
     disabled: !isConnected,
   })
+
+  // Auto-ativa TTS quando modo hands-free liga
+  useEffect(() => {
+    if (wakeWord.state !== 'off' && !voiceOutputEnabled) {
+      setVoiceOutputEnabled(true)
+    }
+  }, [wakeWord.state]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll to bottom
   useEffect(() => {
