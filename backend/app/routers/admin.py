@@ -146,7 +146,28 @@ async def test_ai_config(
             "output_tokens": resp.usage.output_tokens,
         }
     except Exception as e:
-        return {"success": False, "error": str(e), "error_type": type(e).__name__}
+        err = str(e)
+        # Give actionable diagnosis
+        if "401" in err or "403" in err or "authentication" in err.lower():
+            hint = "API key inválida ou sem permissão para este modelo."
+        elif "timeout" in err.lower() or "Timeout" in type(e).__name__:
+            hint = "Timeout — modelo pode estar sobrecarregado. Tente outro modelo."
+        elif "SSL" in err or "certificate" in err.lower():
+            hint = "Erro SSL. Adicione OPENROUTER_SSL_VERIFY=false (ou ANTHROPIC_SSL_VERIFY=false) no .env."
+        elif "connect" in err.lower() or "ConnectError" in type(e).__name__:
+            hint = "Não foi possível conectar. Proxy/firewall bloqueando? Verifique SSL_VERIFY no .env."
+        elif "not_found" in err or "model" in err.lower():
+            hint = f"Modelo '{cfg.model}' não encontrado. Verifique o ID do modelo."
+        else:
+            hint = "Verifique API key, modelo e configurações de rede."
+        return {
+            "success": False,
+            "error": err,
+            "error_type": type(e).__name__,
+            "hint": hint,
+            "provider": cfg.provider,
+            "model": cfg.model,
+        }
 
 
 @router.get("/status")

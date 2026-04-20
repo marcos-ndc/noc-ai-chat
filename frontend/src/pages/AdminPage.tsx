@@ -482,9 +482,14 @@ export function AdminPage() {
                 <div><span className="text-noc-text">Tokens:</span> {testResult.input_tokens} entrada / {testResult.output_tokens} saída</div>
               </div>
             ) : (
-              <div className="text-noc-danger">
+              <div className="text-noc-danger space-y-2">
                 <div><span className="text-noc-text">Tipo:</span> {testResult.error_type}</div>
-                <div className="mt-1 text-noc-muted break-all">{testResult.error}</div>
+                <div className="text-noc-muted break-all text-[10px]">{testResult.error}</div>
+                {testResult.hint && (
+                  <div className="mt-2 px-3 py-2 rounded-lg bg-noc-accent/10 border border-noc-accent/20 text-noc-accent text-[11px]">
+                    💡 {testResult.hint}
+                  </div>
+                )}
               </div>
             )}
           </div>
