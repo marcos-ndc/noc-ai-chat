@@ -205,15 +205,6 @@ class AgentOrchestrator:
                 "Configure em /admin ou adicione ANTHROPIC_API_KEY no .env."
             )
 
-        client = self._build_client(api_key, base_url)
-
-        extra_headers: dict = {}
-        if cfg.provider == AIProvider.openrouter:
-            if cfg.site_url:
-                extra_headers["HTTP-Referer"] = cfg.site_url
-            if cfg.site_name:
-                extra_headers["X-Title"] = cfg.site_name
-
         session.messages.append(ChatMessage(role=MessageRole.user, content=user_message))
         await session_manager.save_session(session)
 
@@ -225,21 +216,32 @@ class AgentOrchestrator:
         full_response = ""
 
         # ── Agentic loop (one stream call per iteration) ──────────────────────
+        # Build the right client per provider
+        from app.agent.llm_client import (
+            build_anthropic_client, build_openrouter_client,
+            stream_anthropic, stream_openrouter,
+        )
+        from app.models import AIProvider as _AIProvider
+        if cfg.provider == _AIProvider.openrouter:
+            llm = build_openrouter_client(
+                api_key, cfg.openrouter_base_url,
+                site_name=cfg.site_name, site_url=cfg.site_url,
+            )
+            stream_fn = stream_openrouter
+        else:
+            llm = build_anthropic_client(api_key)
+            stream_fn = stream_anthropic
+
         while True:
             streamed_text = ""
             tool_calls: list[dict] = []
 
-            # CR-3: real streaming — text tokens arrive as Claude generates them
-            async with client.messages.stream(
-                model=cfg.model,
-                max_tokens=cfg.max_tokens,
-                system=system_prompt,
-                tools=MCP_TOOLS,  # type: ignore[arg-type]
-                messages=claude_messages,
-                **({"extra_headers": extra_headers} if extra_headers else {}),
-            ) as stream:
-                # Stream text tokens to the client in real time
-                async for text in stream.text_stream:
+            async for event_type, event_data in stream_fn(
+                llm, cfg.model, cfg.max_tokens, 1.0,
+                system_prompt, claude_messages, MCP_TOOLS,
+            ):
+                if event_type == "text":
+                    text = event_data
                     streamed_text += text
                     full_response += text
                     yield WSOutbound(
@@ -247,9 +249,8 @@ class AgentOrchestrator:
                         messageId=message_id,
                         content=text,
                     )
-
-                # After streaming, get the final message to check for tool calls
-                final_msg = await stream.get_final_message()
+                elif event_type == "final":
+                    final_msg = event_data
 
             tool_calls = [
                 {"id": b.id, "name": b.name, "input": b.input}
