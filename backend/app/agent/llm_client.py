@@ -84,15 +84,17 @@ async def stream_openrouter(client, model: str, max_tokens: int,
     collected_text  = ""
     tool_calls_raw: dict = {}
 
-    async with client.chat.completions.create(
+    # OpenAI SDK: create() with stream=True returns an async iterable directly
+    # Do NOT use async with — it's not a context manager
+    stream = await client.chat.completions.create(
         model=model,
         max_tokens=max_tokens,
         temperature=temperature,
         messages=oai_messages,
         tools=oai_tools if oai_tools else None,
         stream=True,
-    ) as stream:
-        async for chunk in stream:
+    )
+    async for chunk in stream:
             delta = chunk.choices[0].delta if chunk.choices else None
             if not delta:
                 continue
