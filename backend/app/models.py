@@ -11,6 +11,7 @@ class UserProfile(str, Enum):
     N2 = "N2"
     engineer = "engineer"
     manager = "manager"
+    admin   = "admin"
 
 class MessageRole(str, Enum):
     user = "user"
@@ -89,6 +90,42 @@ class WSOutbound(BaseModel):
 
     def to_json(self) -> str:
         return self.model_dump_json(exclude_none=True)
+
+
+
+# --- AI Config -----------------------------------------------------------
+
+class AIProvider(str, Enum):
+    anthropic  = "anthropic"
+    openrouter = "openrouter"
+
+class AIConfig(BaseModel):
+    provider:            AIProvider = AIProvider.anthropic
+    model:               str        = "claude-sonnet-4-20250514"
+    api_key:             str        = ""
+    temperature:         float      = 1.0
+    max_tokens:          int        = 4096
+    openrouter_base_url: str        = "https://openrouter.ai/api/v1"
+    site_url:            str        = ""
+    site_name:           str        = "NOC AI Chat"
+
+class AIConfigOut(BaseModel):
+    """Public view of AI config - api_key is masked."""
+    provider:            AIProvider
+    model:               str
+    api_key_set:         bool
+    api_key_preview:     str
+    temperature:         float
+    max_tokens:          int
+    openrouter_base_url: str
+    site_name:           str
+
+class ModelOption(BaseModel):
+    id:          str
+    name:        str
+    provider:    AIProvider
+    description: str
+    context_k:   int
 
 
 # ─── Health ──────────────────────────────────────────────────────────────────

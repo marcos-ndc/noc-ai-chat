@@ -1,6 +1,6 @@
 // ─── Core Domain Types ───────────────────────────────────────────────────────
 
-export type UserProfile = 'N1' | 'N2' | 'engineer' | 'manager'
+export type UserProfile = 'N1' | 'N2' | 'engineer' | 'manager' | 'admin'
 
 export interface User {
   id: string
@@ -106,4 +106,59 @@ export interface VoiceSettings {
   language: string
   rate: number
   pitch: number
+}
+
+// ─── Admin / AI Config ────────────────────────────────────────────────────────
+
+export type AIProvider = 'anthropic' | 'openrouter'
+
+export interface AIConfigOut {
+  provider:            AIProvider
+  model:               string
+  api_key_set:         boolean
+  api_key_preview:     string
+  temperature:         number
+  max_tokens:          number
+  openrouter_base_url: string
+  site_name:           string
+}
+
+export interface AIConfigInput {
+  provider:            AIProvider
+  model:               string
+  api_key:             string
+  temperature:         number
+  max_tokens:          number
+  openrouter_base_url: string
+  site_url:            string
+  site_name:           string
+}
+
+export interface ModelOption {
+  id:          string
+  name:        string
+  provider:    AIProvider
+  description: string
+  context_k:   number
+}
+
+export interface AdminStatus {
+  ai: {
+    provider:    AIProvider
+    model:       string
+    api_key_set: boolean
+  }
+  redis: 'ok' | 'down'
+  mcp_servers: Record<string, { status: string }>
+}
+
+export interface TestResult {
+  success:        boolean
+  provider?:      AIProvider
+  model?:         string
+  response?:      string
+  input_tokens?:  number
+  output_tokens?: number
+  error?:         string
+  error_type?:    string
 }

@@ -55,6 +55,13 @@ _USERS: list[dict] = [
         "hashed_password": _hash_password("mgr2024"),
         "profile": UserProfile.manager,
     },
+    {
+        "id": "user-5",
+        "name": "Admin Sistema",
+        "email": "admin-sys@noc.local",
+        "hashed_password": _hash_password("admin-noc-2024"),
+        "profile": UserProfile.admin,
+    },
 ]
 
 
