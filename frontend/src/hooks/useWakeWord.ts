@@ -99,26 +99,9 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
   whisperListenRef.current = () => {
     if (!activeRef.current || !whisper.isSupported) return
     console.log('[WakeWord] Whisper listening started')
-
-    // Use Web Speech API interim for visual feedback while Whisper records
-    whisper.start().then(() => {
-      // Start a silence detection timer — submit after 3s of recording
-      // (Whisper handles silence detection server-side)
-      // Auto-stop after 8s max to prevent very long recordings
-      timerRef.current = setTimeout(async () => {
-        if (stateRef.current === 'listening' && activeRef.current) {
-          console.log('[WakeWord] Whisper auto-stop (8s max)')
-          await whisperSubmit()
-        }
-      }, 8000)
-    })
-  }
-
-  const whisperSubmit = async () => {
-    clearTimer()
-    await whisper.stop()
-    // onResult fires via useWhisperInput's onResult callback
-    // handled in the whisper hook instantiation below
+    // Silence detection is now built into useWhisperInput via Web Audio API
+    // It auto-stops and calls onResult when user pauses for 1.5s
+    whisper.start()
   }
 
   // ── Core recognition loop ─────────────────────────────────────────────────
@@ -326,17 +309,17 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
   }, [ttsState])
 
   useEffect(() => {
+    console.log('[WakeWord] state check:', stateRef.current, 'agent:', agentState, 'tts:', ttsState, 'active:', activeRef.current)
     if (!activeRef.current) return
     if (stateRef.current !== 'waiting' && stateRef.current !== 'speaking') return
     if (ttsState === 'speaking') { if (stateRef.current !== 'speaking') set('speaking'); return }
     if (agentState === 'idle' && ttsState === 'idle') {
-      console.log('[WakeWord] → resume listening after response')
+      console.log('[WakeWord] → resume listening after response, whisper:', whisper.isPremium)
       set('listening')
       clearTimer()
-      // If TTS was active, wait for Chrome to release audio context
-      // If no TTS, restart almost immediately
-      const delay = ttsWasActiveRef.current ? 400 : 100
+      const delay = ttsWasActiveRef.current ? 600 : 150
       timerRef.current = setTimeout(() => {
+        if (!activeRef.current) return
         if (whisper.isPremium) {
           whisperListenRef.current()
         } else {
@@ -344,18 +327,23 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
         }
       }, delay)
     }
-  }, [agentState, ttsState, startRec])
+  }, [agentState, ttsState, startRec, whisper.isPremium])
 
   // ── Public API ────────────────────────────────────────────────────────────
   const activate = useCallback(() => {
     if (!isSupported || disabled) return
-    console.log('[WakeWord] activating...')
+    console.log('[WakeWord] activating... whisper:', whisper.isPremium)
     retryCountRef.current = 0
     activeRef.current = true
     set('listening')
-    // Minimal delay so browser registers click before mic starts
-    timerRef.current = setTimeout(startRec, 80)
-  }, [isSupported, disabled, startRec])
+    timerRef.current = setTimeout(() => {
+      if (whisper.isPremium) {
+        whisperListenRef.current()
+      } else {
+        startRec()
+      }
+    }, 80)
+  }, [isSupported, disabled, startRec, whisper.isPremium])
 
   const deactivate = useCallback(() => {
     console.log('[WakeWord] deactivating', new Error().stack?.split('\n').slice(1,4).join(' | '))
