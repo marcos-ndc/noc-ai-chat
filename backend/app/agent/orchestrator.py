@@ -304,12 +304,42 @@ class AgentOrchestrator:
             claude_messages.append({"role": "user", "content": tool_results})
             # loop → next stream call includes tool results
 
-        # ── Persist complete response ─────────────────────────────────────────
+        # ── Persist + detect ROUTE_TO ─────────────────────────────────────────
         if full_response:
-            session.messages.append(
-                ChatMessage(role=MessageRole.agent, content=full_response)
+            import re as _re
+            route_match = _re.search(
+                r'<ROUTE_TO\s+specialist=["\'](\w+)["\'"]\s+reason=["\'"]([^"\'>]*)["\'"]\s*/?>',
+                full_response, _re.IGNORECASE
             )
-            await session_manager.save_session(session)
+            # Strip the ROUTE_TO tag from stored/displayed message
+            clean_response = _re.sub(
+                r'<ROUTE_TO[^>]*/>', '', full_response, flags=_re.IGNORECASE
+            ).strip()
+
+            session.messages.append(
+                ChatMessage(role=MessageRole.agent, content=clean_response)
+            )
+
+            if route_match:
+                new_spec    = route_match.group(1).lower()
+                route_reason = route_match.group(2)
+                from app.models import Specialist as _Spec, SPECIALIST_LABELS
+                valid = [s.value for s in _Spec]
+                if new_spec in valid and new_spec != session.active_specialist:
+                    session.active_specialist = new_spec
+                    log.info("specialist.route",
+                             specialist=new_spec,
+                             reason=route_reason,
+                             session_id=session.session_id)
+                    await session_manager.save_session(session)
+                    yield WSOutbound(
+                        type=WSEventType.specialist_change,
+                        specialist=new_spec,
+                        content=SPECIALIST_LABELS.get(new_spec, new_spec),
+                        reason=route_reason,
+                    )
+            else:
+                await session_manager.save_session(session)
 
         yield WSOutbound(type=WSEventType.agent_done, messageId=message_id)
 
