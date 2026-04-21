@@ -48,24 +48,51 @@ export type WSEventType =
   | 'agent_done'         // response complete
   | 'tool_start'         // agent started consulting a tool
   | 'tool_end'           // tool consultation done
+  | 'specialist_change'  // agent routed to a specialist
   | 'error'
   | 'ping'
   | 'pong'
 
 export interface WSEvent {
-  type: WSEventType
+  type:       WSEventType
   messageId?: string
-  content?: string
-  tool?: ToolName
-  error?: string
+  content?:   string
+  tool?:      ToolName
+  error?:     string
+  specialist?: string
+  reason?:    string
 }
 
 export interface WSOutboundMessage {
-  type: 'user_message'
-  content: string
-  sessionId: string
-  voiceMode?: boolean   // true quando mensagem veio de voz → agente responde em texto oral
+  type:       'user_message'
+  content:    string
+  sessionId:  string
+  voiceMode?: boolean
+  specialist?: string   // manual specialist selection
 }
+
+export type SpecialistId =
+  | 'generalista'
+  | 'apm'
+  | 'infra'
+  | 'conectividade'
+  | 'observabilidade'
+
+export interface SpecialistInfo {
+  id:    SpecialistId
+  label: string
+  icon:  string
+  desc:  string
+  color: string
+}
+
+export const SPECIALISTS: SpecialistInfo[] = [
+  { id: 'generalista',     label: 'Generalista',     icon: '🤖', desc: 'Triagem geral e diagnóstico inicial',           color: 'text-noc-text' },
+  { id: 'apm',             label: 'APM & Logs',      icon: '📊', desc: 'Erros de app, latência HTTP, traces, logs',    color: 'text-noc-warning' },
+  { id: 'infra',           label: 'Infraestrutura',  icon: '🖥️', desc: 'CPU, memória, disco, disponibilidade de host', color: 'text-noc-success' },
+  { id: 'conectividade',   label: 'Conectividade',   icon: '🌐', desc: 'Latência de rede, BGP, DNS, VPN',              color: 'text-noc-accent' },
+  { id: 'observabilidade', label: 'Observabilidade', icon: '📈', desc: 'Dashboards, SLOs, correlação de métricas',     color: 'text-noc-accent2' },
+]
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 

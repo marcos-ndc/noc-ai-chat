@@ -106,12 +106,20 @@ async def handle_chat_websocket(ws: WebSocket) -> None:
             session_id = inbound.sessionId or connection_id
             session = await get_or_create_session(session_id, user)
 
+            # Manual specialist selection
+            if inbound.specialist and inbound.specialist != session.active_specialist:
+                from app.models import Specialist as _Spec
+                if inbound.specialist in [s.value for s in _Spec]:
+                    session.active_specialist = inbound.specialist
+                    await session_manager.save_session(session)
+
             log.info(
                 "ws.message_received",
                 session_id=session_id,
                 user_id=user.id,
                 content_length=len(inbound.content),
                 voice_mode=inbound.voiceMode,
+                specialist=session.active_specialist,
             )
 
             # Stream agent response
