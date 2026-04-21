@@ -13,6 +13,23 @@ class UserProfile(str, Enum):
     manager = "manager"
     admin   = "admin"
 
+class Specialist(str, Enum):
+    generalista    = "generalista"
+    apm            = "apm"
+    infra          = "infra"
+    conectividade  = "conectividade"
+    observabilidade = "observabilidade"
+
+
+SPECIALIST_LABELS: dict[str, str] = {
+    "generalista":     "Generalista NOC",
+    "apm":             "Especialista APM & Logs",
+    "infra":           "Especialista Infraestrutura",
+    "conectividade":   "Especialista Conectividade",
+    "observabilidade": "Especialista Observabilidade",
+}
+
+
 class MessageRole(str, Enum):
     user = "user"
     agent = "agent"
@@ -70,6 +87,7 @@ class SessionData(BaseModel):
     user_id: str
     user_profile: UserProfile
     messages: list[ChatMessage] = []
+    active_specialist: str = Specialist.generalista   # specialist routing
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -77,16 +95,19 @@ class SessionData(BaseModel):
 
 class WSInbound(BaseModel):
     type: WSEventType
-    content: Optional[str] = None
-    sessionId: Optional[str] = None
-    voiceMode: bool = False  # True quando mensagem veio de entrada por voz
+    content:    Optional[str] = None
+    sessionId:  Optional[str] = None
+    voiceMode:  bool = False
+    specialist: Optional[str] = None  # manual specialist selection
 
 class WSOutbound(BaseModel):
     type: WSEventType
-    messageId: Optional[str] = None
-    content: Optional[str] = None
-    tool: Optional[ToolName] = None
-    error: Optional[str] = None
+    messageId:  Optional[str] = None
+    content:    Optional[str] = None
+    tool:       Optional[ToolName] = None
+    error:      Optional[str] = None
+    specialist: Optional[str] = None   # used in specialist_change events
+    reason:     Optional[str] = None   # why the specialist was changed
 
     def to_json(self) -> str:
         return self.model_dump_json(exclude_none=True)

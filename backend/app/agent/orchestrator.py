@@ -208,7 +208,7 @@ class AgentOrchestrator:
         session.messages.append(ChatMessage(role=MessageRole.user, content=user_message))
         await session_manager.save_session(session)
 
-        system_prompt = get_system_prompt(session.user_profile, voice_mode=voice_mode)
+        system_prompt = get_system_prompt(session.user_profile, specialist=session.active_specialist, voice_mode=voice_mode)
         message_id = str(uuid.uuid4())[:8]
 
         claude_messages = session_manager.build_claude_messages(session)

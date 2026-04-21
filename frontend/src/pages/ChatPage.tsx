@@ -7,6 +7,9 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import { useVoiceOutput } from '../hooks/useVoiceOutput'
 import { useWakeWord } from '../hooks/useWakeWord'
 import { VoiceModal } from '../components/Voice/VoiceModal'
+import { SpecialistSelector } from '../components/Specialist/SpecialistSelector'
+import { SpecialistToast } from '../components/Specialist/SpecialistToast'
+import type { SpecialistId } from '../types'
 import { useAuth, useAuthStore } from '../hooks/useAuth'
 import type { Message, ToolName, WSEvent } from '../types'
 
@@ -56,6 +59,8 @@ export function ChatPage() {
   const [isAgentTyping, setIsAgentTyping] = useState(false)
   const [voiceOutputEnabled, setVoiceOutputEnabled] = useState(false)
   const [voiceMode, setVoiceMode] = useState(false) // true = última mensagem foi por voz
+  const [activeSpecialist, setActiveSpecialist] = useState<SpecialistId>('generalista')
+  const [routeToast, setRouteToast] = useState<{specialist:string,reason:string}|null>(null)
   const [sessionId] = useState(() => generateId())
   const bottomRef = useRef<HTMLDivElement>(null)
   const currentAgentMsgId = useRef<string | null>(null)
@@ -68,6 +73,13 @@ export function ChatPage() {
   // Handle incoming WS events
   const handleWSMessage = useCallback((event: WSEvent) => {
     switch (event.type) {
+      case 'specialist_change':
+        if (event.specialist) {
+          setActiveSpecialist(event.specialist as SpecialistId)
+          setRouteToast({ specialist: event.specialist, reason: event.reason ?? '' })
+        }
+        break
+
       case 'tool_start':
         if (event.tool) setActiveTools(prev => [...new Set([...prev, event.tool!])])
         break
@@ -183,12 +195,25 @@ export function ChatPage() {
     setMessages(prev => [...prev, userMsg])
 
     // Usa fromVoice diretamente — voiceMode state ainda não atualizou (React async)
-    send({ type: 'user_message', content, sessionId, voiceMode: fromVoice })
+    send({ type: 'user_message', content, sessionId, voiceMode: fromVoice, specialist: activeSpecialist })
   }, [send, sessionId])
 
   return (
     <div className="flex flex-col h-screen noc-grid scanlines">
       <Header user={user} isConnected={isConnected} onLogout={logout} voiceMode={voiceMode} handsFreeState={wakeWord.state} />
+      <div className="flex items-center justify-between px-4 py-1.5 border-b border-noc-border/40 bg-noc-bg/40">
+        <SpecialistSelector
+          active={activeSpecialist}
+          onChange={id => {
+            setActiveSpecialist(id)
+            setRouteToast(null)
+          }}
+          disabled={isAgentTyping}
+        />
+        <p className="text-[10px] font-mono text-noc-muted">
+          {activeSpecialist !== 'generalista' && '🔀 especialista ativo'}
+        </p>
+      </div>
 
       {/* Messages area */}
       <main className="flex-1 overflow-y-auto py-4 space-y-1">
@@ -252,6 +277,10 @@ export function ChatPage() {
         }
       />
       {/* Voice modal overlay */}
+      <SpecialistToast
+        specialist={routeToast?.specialist ?? null}
+        reason={routeToast?.reason ?? null}
+      />
       <VoiceModal
         state={wakeWord.state}
         onClose={wakeWord.deactivate}
