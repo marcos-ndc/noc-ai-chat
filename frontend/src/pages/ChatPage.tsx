@@ -234,8 +234,9 @@ export function ChatPage() {
         handsFreeActive={wakeWord.state !== 'off'}
         handsFreeSupported={wakeWord.isSupported}
         onHandsFreeToggle={() => {
-          // Read from ref to avoid stale closure, and stop any event propagation
-          if (wakeWord.state !== 'off') {
+          // Use isActive ref — always reads LIVE value, avoids stale closure bug
+          // wakeWord.state is captured at render time and can be stale
+          if (wakeWord.isActive.current) {
             wakeWord.deactivate()
           } else {
             wakeWord.activate()

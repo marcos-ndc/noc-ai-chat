@@ -172,5 +172,5 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
     stopRec()
   }, [])
 
-  return { state, activate, deactivate, isSupported }
+  return { state, activate, deactivate, isSupported, isActive: activeRef }
 }
