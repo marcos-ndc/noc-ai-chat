@@ -252,12 +252,14 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false, s
     const greeting = greetings[Math.floor(Math.random() * greetings.length)]
 
     if (speakRef.current) {
+      doSet('speaking')   // show modal immediately while greeting plays
       speakRef.current(greeting)
       // Wait for greeting to finish before listening (~2s)
       timerRef.current = setTimeout(() => {
         if (activeRef.current) startListeningRef.current()
       }, 2200)
     } else {
+      doSet('listening')
       timerRef.current = setTimeout(() => startListeningRef.current(), 100)
     }
   }, [isSupported, disabled])
