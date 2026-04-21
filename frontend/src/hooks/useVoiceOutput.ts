@@ -18,13 +18,29 @@ export interface TTSVoiceOption {
   gender:  string
 }
 
+interface ELVoice {
+  name:   string
+  desc:   string
+  gender: string
+  accent: string
+  preset?: boolean
+}
+
+interface ProviderStatus {
+  available:      boolean
+  default_voice?:    string
+  default_voice_id?: string
+  default_model:  string
+  voices:         Record<string, TTSVoiceOption | ELVoice>
+  models:         Record<string, string>
+  error?:         string
+}
+
 interface TTSStatus {
-  available: boolean
-  voice:     string
-  model:     string
-  speed:     number
-  voices:    Record<string, TTSVoiceOption>
-  models:    Record<string, string>
+  openai:           ProviderStatus
+  elevenlabs:       ProviderStatus
+  available:        boolean
+  default_provider: string
 }
 
 interface UseVoiceOutputReturn {
@@ -40,12 +56,17 @@ interface UseVoiceOutputReturn {
   setVoice:     (voice: string) => void
   setModel:     (model: string) => void
   setSpeed:     (speed: number) => void
+  setProvider:  (provider: string) => void
+  provider:     string
 }
 
 export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   const [state, setState] = useState<VoiceOutputState>('idle')
   const [ttsStatus, setTtsStatus] = useState<TTSStatus | null>(null)
   // Persist voice settings in sessionStorage so admin panel changes apply to chat
+  const [selectedProvider, setSelectedProvider] = useState<string>(
+    () => sessionStorage.getItem('tts_provider') || 'openai'
+  )
   const [selectedVoice, setSelectedVoiceState] = useState<string>(
     () => sessionStorage.getItem('tts_voice') || 'onyx'
   )
@@ -69,13 +90,20 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
 
   // ── Check OpenAI TTS availability on mount ────────────────────────────────
   useEffect(() => {
-    fetch(`${API_URL}/tts/status`)
+    fetch(`${API_URL}/tts/voices`)
       .then(r => r.json())
       .then((data: TTSStatus) => {
         setTtsStatus(data)
-        setSelectedVoice(data.voice)
-        setSelectedModel(data.model)
-        setSelectedSpeed(data.speed)
+        // Set defaults from the appropriate provider
+        const defaultProv = data.default_provider || 'openai'
+        setSelectedProvider(defaultProv)
+        if (defaultProv === 'elevenlabs' && data.elevenlabs?.default_voice_id) {
+          setSelectedVoice(data.elevenlabs.default_voice_id)
+          setSelectedModel(data.elevenlabs.default_model)
+        } else if (data.openai) {
+          setSelectedVoice(data.openai.default_voice || 'onyx')
+          setSelectedModel(data.openai.default_model || 'tts-1-hd')
+        }
       })
       .catch(() => {/* silently fallback to browser TTS */})
   }, [])
@@ -111,7 +139,13 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
       const resp = await fetch(`${API_URL}/tts/speak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice: selectedVoice, model: selectedModel, speed: selectedSpeed }),
+        body: JSON.stringify({
+          text,
+          provider: selectedProvider,
+          voice:    selectedVoice,
+          model:    selectedModel,
+          speed:    selectedSpeed,
+        }),
         signal: abortRef.current.signal,
       })
 
@@ -205,15 +239,17 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   return {
     state,
     isSupported,
-    isPremium:    ttsStatus?.available ?? false,
+    isPremium:    (ttsStatus?.available ?? false),
+    provider:     selectedProvider,
     currentVoice: ttsStatus?.available ? selectedVoice : 'browser',
     ttsStatus,
     speak,
     stop,
     pause,
     resume,
-    setVoice: setSelectedVoice,
-    setModel: setSelectedModel,
-    setSpeed: setSelectedSpeed,
+    setVoice:    setSelectedVoice,
+    setModel:    setSelectedModel,
+    setSpeed:    setSelectedSpeed,
+    setProvider: (p: string) => { setSelectedProvider(p); sessionStorage.setItem('tts_provider', p) },
   }
 }

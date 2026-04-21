@@ -5,13 +5,20 @@ import type { AIConfigInput, AIConfigOut, AdminStatus, ModelOption, TestResult }
 
 const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
+interface ProviderTTS {
+  available:         boolean
+  default_voice?:    string
+  default_voice_id?: string
+  default_model:     string
+  voices:            Record<string, { name?: string; label?: string; desc?: string; gender: string; accent?: string; preset?: boolean }>
+  models:            Record<string, string>
+}
+
 interface TTSStatus {
-  available: boolean
-  voice:     string
-  model:     string
-  speed:     number
-  voices:    Record<string, { label: string; desc: string; gender: string }>
-  models:    Record<string, string>
+  openai:           ProviderTTS
+  elevenlabs:       ProviderTTS
+  available:        boolean
+  default_provider: string
 }
 
 function useAdminAPI() {
@@ -153,6 +160,7 @@ export function AdminPage() {
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [saveMsg,   setSaveMsg]   = useState('')
   const [ttsInfo,   setTtsInfo]   = useState<TTSStatus | null>(null)
+  const [ttsProvider, setTtsProvider] = useState('openai')
   const [ttsVoice,  setTtsVoice]  = useState('onyx')
   const [ttsModel,  setTtsModel]  = useState('tts-1-hd')
   const [ttsSpeed,  setTtsSpeed]  = useState(0.92)
@@ -524,7 +532,7 @@ export function AdminPage() {
 
         {/* TTS Voice Settings */}
         <SectionCard title="VOZ — TEXTO PARA FALA" icon="🎙️">
-          {!ttsInfo?.available ? (
+          {!(ttsInfo?.openai?.available || ttsInfo?.elevenlabs?.available) ? (
             <div className="p-4 rounded-xl bg-noc-warning/5 border border-noc-warning/30 text-xs font-mono text-noc-warning space-y-2">
               <p className="font-bold">⚠️ Voz premium não configurada</p>
               <p className="text-noc-muted">Adicione <span className="text-noc-accent">OPENAI_API_KEY=sk-...</span> no <span className="text-noc-accent">.env</span> e reinicie o backend para ativar a voz OpenAI.</p>
@@ -536,16 +544,40 @@ export function AdminPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-noc-success/10 border border-noc-success/30 text-xs font-mono text-noc-success">
-                <span>✓</span>
-                <span>Voz premium OpenAI ativa — usando <strong>{ttsModel}</strong></span>
+
+              {/* Provider selector */}
+              <div>
+                <label className="text-[10px] font-mono text-noc-muted mb-2 block">PROVEDOR DE VOZ</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'openai',      label: 'OpenAI TTS',  icon: '🤖', desc: 'Bom em pt-BR, 6 vozes', available: ttsInfo?.openai?.available },
+                    { id: 'elevenlabs',  label: 'ElevenLabs',  icon: '🇧🇷', desc: 'Nativo pt-BR — recomendado', available: ttsInfo?.elevenlabs?.available },
+                  ].map(p => (
+                    <button key={p.id} type="button"
+                      onClick={() => { setTtsProvider(p.id); setTtsVoice(''); }}
+                      disabled={!p.available}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        ttsProvider === p.id
+                          ? 'border-noc-accent bg-noc-accent/5'
+                          : 'border-noc-border/60 bg-noc-bg/30 hover:border-noc-border'
+                      } ${!p.available ? 'opacity-40 cursor-not-allowed' : ''}`}
+                    >
+                      <div className={`text-xs font-bold font-mono flex items-center gap-1.5 mb-0.5 ${ttsProvider === p.id ? 'text-noc-accent' : 'text-noc-text'}`}>
+                        {p.icon} {p.label}
+                        {ttsProvider === p.id && <span className="text-[9px] bg-noc-accent text-noc-bg px-1.5 py-0.5 rounded-full">ATIVO</span>}
+                        {!p.available && <span className="text-[9px] text-noc-muted">sem chave</span>}
+                      </div>
+                      <p className="text-[10px] text-noc-muted">{p.desc}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Model selector */}
               <div>
                 <label className="text-[10px] font-mono text-noc-muted mb-2 block">QUALIDADE DO MODELO</label>
                 <div className="grid grid-cols-2 gap-3">
-                  {ttsInfo.models && Object.entries(ttsInfo.models).map(([id, desc]) => (
+                  {(ttsProvider === 'elevenlabs' ? ttsInfo?.elevenlabs?.models : ttsInfo?.openai?.models) && Object.entries((ttsProvider === 'elevenlabs' ? ttsInfo?.elevenlabs?.models : ttsInfo?.openai?.models) ?? {}).map(([id, desc]) => (
                     <button
                       key={id}
                       type="button"
@@ -568,27 +600,39 @@ export function AdminPage() {
 
               {/* Voice selector */}
               <div>
-                <label className="text-[10px] font-mono text-noc-muted mb-2 block">VOZ</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {ttsInfo.voices && Object.entries(ttsInfo.voices).map(([id, v]) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setTtsVoice(id)}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        ttsVoice === id
-                          ? 'border-noc-accent bg-noc-accent/5'
-                          : 'border-noc-border/60 hover:border-noc-border bg-noc-bg/30'
-                      }`}
-                    >
-                      <div className={`text-xs font-bold font-mono mb-0.5 flex items-center gap-1.5 ${ttsVoice === id ? 'text-noc-accent' : 'text-noc-text'}`}>
-                        <span>{v.gender === 'masculino' ? '🔵' : v.gender === 'feminino' ? '🔴' : '⚪'}</span>
-                        {v.label}
-                        {ttsVoice === id && <span className="text-[9px] bg-noc-accent text-noc-bg px-1.5 py-0.5 rounded-full font-bold">ATIVA</span>}
-                      </div>
-                      <p className="text-[10px] text-noc-muted leading-relaxed">{v.desc}</p>
-                    </button>
-                  ))}
+                <label className="text-[10px] font-mono text-noc-muted mb-2 block">
+                  VOZ {ttsProvider === 'elevenlabs' ? '— pt-BR Nativo 🇧🇷' : '— OpenAI'}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {ttsProvider === 'elevenlabs'
+                    ? ttsInfo?.elevenlabs?.voices && Object.entries(ttsInfo.elevenlabs.voices).map(([id, v]: [string, any]) => (
+                        <button key={id} type="button" onClick={() => setTtsVoice(id)}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            ttsVoice === id ? 'border-noc-accent bg-noc-accent/5' : 'border-noc-border/60 hover:border-noc-border bg-noc-bg/30'
+                          }`}>
+                          <div className={`text-xs font-bold font-mono mb-0.5 flex items-center gap-1.5 ${ttsVoice === id ? 'text-noc-accent' : 'text-noc-text'}`}>
+                            <span>{(v as any).gender === 'masculino' ? '🔵' : '🔴'}</span>
+                            {(v as any).name}
+                            {ttsVoice === id && <span className="text-[9px] bg-noc-accent text-noc-bg px-1.5 py-0.5 rounded-full">ATIVA</span>}
+                            {v.preset && <span className="text-[9px] text-noc-muted">preset</span>}
+                          </div>
+                          <p className="text-[10px] text-noc-muted">{v.desc || v.accent}</p>
+                        </button>
+                      ))
+                    : ttsInfo?.openai?.voices && Object.entries(ttsInfo.openai.voices).map(([id, v]: [string, any]) => (
+                        <button key={id} type="button" onClick={() => setTtsVoice(id)}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            ttsVoice === id ? 'border-noc-accent bg-noc-accent/5' : 'border-noc-border/60 hover:border-noc-border bg-noc-bg/30'
+                          }`}>
+                          <div className={`text-xs font-bold font-mono mb-0.5 flex items-center gap-1.5 ${ttsVoice === id ? 'text-noc-accent' : 'text-noc-text'}`}>
+                            <span>{v.gender === 'masculino' ? '🔵' : v.gender === 'feminino' ? '🔴' : '⚪'}</span>
+                            {v.label}
+                            {ttsVoice === id && <span className="text-[9px] bg-noc-accent text-noc-bg px-1.5 py-0.5 rounded-full">ATIVA</span>}
+                          </div>
+                          <p className="text-[10px] text-noc-muted">{v.desc}</p>
+                        </button>
+                      ))
+                  }
                 </div>
               </div>
 
@@ -614,6 +658,7 @@ export function AdminPage() {
                     setTtsSaving(true)
                     setTtsSaveMsg('')
                     // Persist to sessionStorage so useVoiceOutput picks up changes
+                    sessionStorage.setItem('tts_provider', ttsProvider)
                     sessionStorage.setItem('tts_voice', ttsVoice)
                     sessionStorage.setItem('tts_model', ttsModel)
                     sessionStorage.setItem('tts_speed', String(ttsSpeed))
@@ -628,8 +673,11 @@ export function AdminPage() {
                   {ttsSaving ? <div className="w-3.5 h-3.5 border-2 border-noc-bg/30 border-t-noc-bg rounded-full animate-spin" /> : '🎙️'}
                   Aplicar Voz
                 </button>
-                <div className="text-[10px] font-mono text-noc-muted">
-                  Para tornar permanente: <span className="text-noc-accent">TTS_VOICE={ttsVoice}</span> e <span className="text-noc-accent">TTS_MODEL={ttsModel}</span> no .env
+                <div className="text-[10px] font-mono text-noc-muted space-y-0.5">
+                  {ttsProvider === 'elevenlabs'
+                    ? <><span className="text-noc-accent">ELEVENLABS_VOICE_ID={ttsVoice}</span> no .env</>
+                    : <><span className="text-noc-accent">TTS_VOICE={ttsVoice}</span> e <span className="text-noc-accent">TTS_MODEL={ttsModel}</span> no .env</>
+                  }
                 </div>
               </div>
 
