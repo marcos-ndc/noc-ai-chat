@@ -218,6 +218,50 @@ async def list_organizations(_: dict = {}):
         return {"error": str(e), "tool": "zabbix_list_organizations"}
 
 
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def _enrich_triggers(triggers: list) -> list:
+    """Convert raw trigger.get response to enriched alert format."""
+    import time as _time
+    enriched = []
+    for t in triggers:
+        priority = str(t.get("priority", "0"))
+        lastchange = int(t.get("lastchange", 0))
+        now = int(_time.time())
+        duration_minutes = (now - lastchange) // 60 if lastchange else 0
+
+        hosts = [
+            {"host": h.get("host", ""), "name": h.get("name", h.get("host", ""))}
+            for h in t.get("hosts", [])
+        ]
+
+        # Extract organization from host tags if available
+        organization = None
+        for h in t.get("hosts", []):
+            for tag in h.get("tags", []):
+                if tag.get("tag", "").lower() == "organization":
+                    organization = tag.get("value")
+                    break
+
+        enriched.append({
+            "triggerid":       t.get("triggerid"),
+            "description":     t.get("description", ""),
+            "priority":        priority,
+            "severity_label":  SEVERITY_LABEL.get(int(priority), "unknown"),
+            "severity_int":    int(priority),
+            "lastchange":      lastchange,
+            "lastchange_iso":  _time.strftime(
+                "%Y-%m-%dT%H:%M:%SZ", _time.gmtime(lastchange)
+            ) if lastchange else None,
+            "duration_minutes": duration_minutes,
+            "hosts":           hosts,
+            "organization":    organization,
+            "url":             t.get("url", ""),
+            "comments":        t.get("comments", ""),
+        })
+    return enriched
+
+
 # ─── Tool: get_active_alerts ─────────────────────────────────────────────────
 
 class GetActiveAlertsInput(BaseModel):
