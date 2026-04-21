@@ -22,7 +22,13 @@ const WAKE_WORDS = [
 const STOP_WORDS = [
   'noc obrigado', 'nokia obrigado', 'tchau noc', 'tchau nokia',
   'pare noc', 'pare nokia', 'obrigado noc',
+  // variações que o pt-BR pode transcrever
+  'nok obrigado', 'obrigado nok', 'tchau nok',
+  'encerrar noc', 'encerrar nokia', 'finalizar noc',
 ]
+
+const isStopWord = (text: string): boolean =>
+  STOP_WORDS.some(w => text.toLowerCase().includes(w))
 
 interface Options {
   onQuery:    (text: string) => void
@@ -108,10 +114,16 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
         silenceTimerRef.current = setTimeout(() => {
           // Only submit if still in listening (no final result arrived)
           if (stateRef.current === 'listening' && transcriptRef.current.length > 2) {
-            const q = transcriptRef.current.replace(/(olá|ola|hey|ei|oi)?\s*(noc|nokia|nok)/gi, '').trim()
+            const text = transcriptRef.current
+            transcriptRef.current = ''
+            hasInterimRef.current = false
+            // Check stop word BEFORE submitting
+            if (isStopWord(text)) {
+              console.log('[WakeWord] speechend → stop word detected')
+              activeRef.current = false; stopRec(); set('off'); return
+            }
+            const q = text.replace(/(olá|ola|hey|ei|oi)?\s*(noc|nokia|nok)/gi, '').trim()
             if (q.length > 1) {
-              transcriptRef.current = ''
-              hasInterimRef.current = false
               set('waiting')
               onQueryRef.current(q)
               stopRec()
@@ -137,6 +149,13 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
             const pending = transcriptRef.current.trim()
             if (pending.length > 2 && stateRef.current === 'listening' && activeRef.current) {
               console.log('[WakeWord] silence detected → auto-submit:', pending)
+              // Check stop word BEFORE submitting
+              if (isStopWord(pending)) {
+                console.log('[WakeWord] silence timer → stop word detected')
+                transcriptRef.current = ''
+                hasInterimRef.current = false
+                activeRef.current = false; stopRec(); set('off'); return
+              }
               const q = pending.replace(/(olá|ola|hey|ei|oi)?\s*(noc|nokia|nok)/gi, '').trim()
               if (q.length > 1) {
                 transcriptRef.current = ''
@@ -178,7 +197,7 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
       console.log('[WakeWord] heard:', `"${raw}"`, '| mode:', mode, '| conf:', confidence?.toFixed(2))
       retryCountRef.current = 0
 
-      if (STOP_WORDS.some(w => raw.includes(w))) {
+      if (isStopWord(raw)) {
         console.log('[WakeWord] → stop')
         activeRef.current = false
         stopRec()
