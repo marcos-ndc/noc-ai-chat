@@ -30,9 +30,10 @@ interface Options {
   agentState: 'idle' | 'typing'
   ttsState:   'idle' | 'speaking' | 'paused'
   disabled?:  boolean
+  speak?:     (text: string) => void   // TTS function for greetings
 }
 
-export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }: Options) {
+export function useWakeWord({ onQuery, agentState, ttsState, disabled = false, speak }: Options) {
   const [state, setState] = useState<HandsFreeState>('off')
 
   // All mutable state in refs to avoid stale closures
@@ -41,10 +42,12 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
   const recRef      = useRef<SpeechRecognition | null>(null)
   const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
   const onQueryRef  = useRef(onQuery)
+  const speakRef    = useRef(speak)
   const ttsRef      = useRef(ttsState)
   const agentRef    = useRef(agentState)
 
   useEffect(() => { onQueryRef.current = onQuery },    [onQuery])
+  useEffect(() => { speakRef.current    = speak },      [speak])
   useEffect(() => { ttsRef.current     = ttsState },   [ttsState])
   useEffect(() => { agentRef.current   = agentState }, [agentState])
 
@@ -55,7 +58,7 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
   const whisper = useWhisperInput((text) => {
     console.log('[WakeWord] Whisper result:', `"${text}"`)
     if (!activeRef.current) return
-    if (isStopWord(text)) { doDeactivate(); return }
+    if (isStopWord(text)) { doDeactivate(true); return }
     if (stateRef.current !== 'listening') return
     const q = text.replace(/(olá|ola|hey|ei|oi)?\s*(noc|nokia|nok)\b/gi, '').trim()
     if (q.length > 1) {
@@ -82,8 +85,19 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
     }
   }
 
-  const doDeactivate = () => {
-    console.log('[WakeWord] deactivate')
+  const doDeactivate = (withFarewell = false) => {
+    console.log('[WakeWord] deactivate, farewell:', withFarewell)
+
+    if (withFarewell && speakRef.current) {
+      const farewells = [
+        'Até logo! Fico por aqui.',
+        'Tudo bem! Qualquer coisa é só chamar.',
+        'Até mais!',
+        'Ok, encerrando. Até logo!',
+      ]
+      speakRef.current(farewells[Math.floor(Math.random() * farewells.length)])
+    }
+
     activeRef.current = false
     clearTimer()
     killRec()
@@ -136,7 +150,7 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
       if (!last?.isFinal) return
       const raw = last[0].transcript.toLowerCase().trim()
       console.log('[WakeWord] WebSpeech heard:', `"${raw}"`)
-      if (isStopWord(raw)) { doDeactivate(); return }
+      if (isStopWord(raw)) { doDeactivate(true); return }
       if (stateRef.current !== 'listening') return
       const q = raw.replace(/(olá|ola|hey|ei|oi)?\s*(noc|nokia|nok)\b/gi, '').trim()
       if (q.length > 1) { doSet('waiting'); onQueryRef.current(q) }
@@ -173,7 +187,7 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
       if (!last?.isFinal) return
       const raw = last[0].transcript.toLowerCase().trim()
       console.log('[WakeWord] standby heard:', `"${raw}"`)
-      if (isStopWord(raw)) { doDeactivate(); return }
+      if (isStopWord(raw)) { doDeactivate(true); return }
       const hit = WAKE_WORDS.some(w => raw.includes(w))
       if (!hit) return
       let q = raw
@@ -227,10 +241,28 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
     if (!isSupported || disabled) return
     console.log('[WakeWord] activating')
     activeRef.current = true
-    timerRef.current = setTimeout(() => startListeningRef.current(), 100)
+
+    // Greeting via TTS before starting to listen
+    const greetings = [
+      'Olá! Como posso ajudar?',
+      'Olá! Estou ouvindo.',
+      'Prontinho! Pode falar.',
+      'Olá! Em que posso ajudar?',
+    ]
+    const greeting = greetings[Math.floor(Math.random() * greetings.length)]
+
+    if (speakRef.current) {
+      speakRef.current(greeting)
+      // Wait for greeting to finish before listening (~2s)
+      timerRef.current = setTimeout(() => {
+        if (activeRef.current) startListeningRef.current()
+      }, 2200)
+    } else {
+      timerRef.current = setTimeout(() => startListeningRef.current(), 100)
+    }
   }, [isSupported, disabled])
 
-  const deactivate = useCallback(() => doDeactivate(), []) // eslint-disable-line react-hooks/exhaustive-deps
+  const deactivate = useCallback(() => doDeactivate(true), []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => { activeRef.current = false; clearTimer(); killRec() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
