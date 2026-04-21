@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { VoiceInputButton } from '../VoiceInput/VoiceInputButton'
 import { VoiceOutputToggle } from '../VoiceOutput/VoiceOutputToggle'
 import { useVoiceInput } from '../../hooks/useVoiceInput'
+import { useWhisperInput } from '../../hooks/useWhisperInput'
 import type { VoiceOutputState } from '../../types'
 
 interface ChatInputProps {
@@ -38,13 +39,22 @@ export function ChatInput({
 
   const fromVoiceRef = useRef(false)
 
+  // Use Whisper (premium) or Web Speech API (fallback)
+  const whisperInput = useWhisperInput((transcript) => {
+    if (!transcript.trim()) return
+    fromVoiceRef.current = false
+    setValue('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    if (onVoiceSend) onVoiceSend(transcript.trim())
+  })
+
   const voiceInput = useVoiceInput({
     onResult: (transcript) => {
       if (!transcript.trim()) return
+      // Only use Web Speech if Whisper not available
+      if (whisperInput.isPremium) return
       fromVoiceRef.current = true
       setValue(transcript)
-      // Auto-send: submit immediately when voice recognition completes
-      // Use setTimeout to let React flush setValue before reading it in handleSend
       setTimeout(() => {
         const trimmed = transcript.trim()
         if (trimmed && onVoiceSend) {
@@ -57,6 +67,12 @@ export function ChatInput({
     },
   })
 
+  // Unified voice state: Whisper takes priority
+  const isRecording = whisperInput.isPremium
+    ? whisperInput.state === 'recording'
+    : voiceInput.state === 'listening'
+  const isTranscribing = whisperInput.state === 'transcribing'
+
   // Auto-resize textarea
   useEffect(() => {
     const ta = textareaRef.current
@@ -67,7 +83,7 @@ export function ChatInput({
 
   // Fill input from voice transcript while speaking
   useEffect(() => {
-    if (voiceInput.state === 'listening' && voiceInput.transcript) {
+    if (isRecording && voiceInput.transcript) {
       setValue(voiceInput.transcript)
     }
   }, [voiceInput.transcript, voiceInput.state])
@@ -97,7 +113,7 @@ export function ChatInput({
   return (
     <div className="border-t border-noc-border bg-noc-bg px-4 py-3">
       {/* Voice transcript preview */}
-      {voiceInput.state === 'listening' && voiceInput.transcript && (
+      {isRecording && voiceInput.transcript && (
         <div className="mb-2 px-3 py-1.5 rounded-lg bg-noc-danger/10 border border-noc-danger/20 text-xs text-noc-muted font-mono">
           <span className="text-noc-danger mr-1">●</span>
           {voiceInput.transcript}
@@ -169,10 +185,16 @@ export function ChatInput({
 
         {/* Voice input button */}
         <VoiceInputButton
-          state={voiceInput.state}
-          isSupported={voiceInput.isSupported}
-          onStart={voiceInput.start}
-          onStop={voiceInput.stop}
+          state={isRecording ? 'listening' : isTranscribing ? 'processing' : 'idle'}
+          isSupported={voiceInput.isSupported || whisperInput.isSupported}
+          onStart={async () => {
+            if (whisperInput.isPremium) await whisperInput.start()
+            else voiceInput.start()
+          }}
+          onStop={async () => {
+            if (whisperInput.isPremium) await whisperInput.stop()
+            else voiceInput.stop()
+          }}
         />
       </div>
 

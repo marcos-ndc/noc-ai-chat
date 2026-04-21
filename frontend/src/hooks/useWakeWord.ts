@@ -5,6 +5,7 @@
  * Diz "NOC obrigado" para encerrar.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useWhisperInput } from './useWhisperInput'
 
 export type HandsFreeState =
   | 'off'
@@ -38,6 +39,24 @@ interface Options {
 }
 
 export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }: Options) {
+  // Whisper for precise transcription in listening mode
+  const whisper = useWhisperInput((text) => {
+    // Called when Whisper returns transcription
+    clearTimer()
+    console.log('[WakeWord] Whisper result:', `"${text}"`)
+    if (!activeRef.current) return
+    if (isStopWord(text)) {
+      console.log('[WakeWord] Whisper → stop word')
+      activeRef.current = false; stopRec(); set('off'); return
+    }
+    if (stateRef.current === 'listening' && text.length > 1) {
+      const q = text.replace(/(olá|ola|hey|ei|oi)?\s*(noc|nokia|nok)/gi, '').trim()
+      if (q.length > 1) {
+        set('waiting')
+        onQueryRef.current(q)
+      }
+    }
+  })
   const [state, setState]   = useState<HandsFreeState>('off')
   const stateRef            = useRef<HandsFreeState>('off')
   const recRef              = useRef<SpeechRecognition | null>(null)
@@ -73,6 +92,35 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
     }
   }
 
+  // ── Whisper listening session ────────────────────────────────────────────
+  // Called when we need to capture a question (not wake word detection)
+  const whisperListenRef = useRef<() => void>(() => {})
+
+  whisperListenRef.current = () => {
+    if (!activeRef.current || !whisper.isSupported) return
+    console.log('[WakeWord] Whisper listening started')
+
+    // Use Web Speech API interim for visual feedback while Whisper records
+    whisper.start().then(() => {
+      // Start a silence detection timer — submit after 3s of recording
+      // (Whisper handles silence detection server-side)
+      // Auto-stop after 8s max to prevent very long recordings
+      timerRef.current = setTimeout(async () => {
+        if (stateRef.current === 'listening' && activeRef.current) {
+          console.log('[WakeWord] Whisper auto-stop (8s max)')
+          await whisperSubmit()
+        }
+      }, 8000)
+    })
+  }
+
+  const whisperSubmit = async () => {
+    clearTimer()
+    await whisper.stop()
+    // onResult fires via useWhisperInput's onResult callback
+    // handled in the whisper hook instantiation below
+  }
+
   // ── Core recognition loop ─────────────────────────────────────────────────
   const startRec = useCallback(() => {
     if (!isSupported || !activeRef.current) return
@@ -90,13 +138,14 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
     ;(rec as unknown as {maxAlternatives: number}).maxAlternatives = mode === 'standby' ? 3 : 1
 
     if (mode === 'standby') {
-      // Standby: continuous session waiting for wake word in background
+      // Standby: Web Speech API (continuous, low CPU, wake word detection)
       rec.continuous     = true
       rec.interimResults = false
     } else {
-      // Listening: single utterance — Chrome auto-stops after speech ends
+      // Listening: if Whisper available, use it instead of Web Speech API
+      // Whisper is called separately via whisperListenRef.current()
       rec.continuous     = false
-      rec.interimResults = true   // show partial transcript for UX feedback
+      rec.interimResults = true
     }
 
     recRef.current = rec
@@ -287,7 +336,13 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
       // If TTS was active, wait for Chrome to release audio context
       // If no TTS, restart almost immediately
       const delay = ttsWasActiveRef.current ? 400 : 100
-      timerRef.current = setTimeout(startRec, delay)
+      timerRef.current = setTimeout(() => {
+        if (whisper.isPremium) {
+          whisperListenRef.current()
+        } else {
+          startRec()
+        }
+      }, delay)
     }
   }, [agentState, ttsState, startRec])
 
