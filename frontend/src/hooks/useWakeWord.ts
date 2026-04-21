@@ -40,6 +40,8 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
   const activeRef           = useRef(false)
   const timerRef            = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryCountRef       = useRef(0)
+  const silenceTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hasInterimRef       = useRef(false)   // tracks if we received any speech
   const transcriptRef        = useRef('')
 
   useEffect(() => { onQueryRef.current = onQuery }, [onQuery])
@@ -55,6 +57,9 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
   }
 
   const stopRec = () => {
+    if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null }
+    hasInterimRef.current = false
+    transcriptRef.current = ''
     if (recRef.current) {
       const r = recRef.current
       recRef.current = null
@@ -76,18 +81,45 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
 
     rec.lang = 'pt-BR'
 
+    ;(rec as unknown as {maxAlternatives: number}).maxAlternatives = mode === 'standby' ? 3 : 1
+
     if (mode === 'standby') {
       // Standby: continuous session waiting for wake word in background
       rec.continuous     = true
       rec.interimResults = false
     } else {
       // Listening: single utterance — Chrome auto-stops after speech ends
-      // This avoids capturing ambient noise between sentences
       rec.continuous     = false
       rec.interimResults = true   // show partial transcript for UX feedback
     }
 
     recRef.current = rec
+
+    // speechend fires when Chrome detects the user STOPPED speaking
+    // Use it to immediately submit the last interim transcript
+    rec.addEventListener('speechend', () => {
+      if (mode !== 'listening') return
+      // Clear existing silence timer — submit immediately
+      if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null }
+      const pending = transcriptRef.current.trim()
+      if (pending.length > 2 && stateRef.current === 'listening' && activeRef.current) {
+        console.log('[WakeWord] speechend → submit:', pending)
+        // Short delay to allow final result to arrive first
+        silenceTimerRef.current = setTimeout(() => {
+          // Only submit if still in listening (no final result arrived)
+          if (stateRef.current === 'listening' && transcriptRef.current.length > 2) {
+            const q = transcriptRef.current.replace(/(olá|ola|hey|ei|oi)?\s*(noc|nokia|nok)/gi, '').trim()
+            if (q.length > 1) {
+              transcriptRef.current = ''
+              hasInterimRef.current = false
+              set('waiting')
+              onQueryRef.current(q)
+              stopRec()
+            }
+          }
+        }, 300)
+      }
+    })
 
     rec.addEventListener('result', (e: SpeechRecognitionEvent) => {
       const last = e.results[e.results.length - 1]
@@ -97,12 +129,33 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
         const interim = last[0].transcript
         if (interim.length > 2) {
           transcriptRef.current = interim
-          // Notify for UI preview — handled in ChatInput
+          hasInterimRef.current = true
+          // Reset silence timer — user is still speaking
+          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+          // If user pauses for 1.2s after speaking, force-submit interim as final
+          silenceTimerRef.current = setTimeout(() => {
+            const pending = transcriptRef.current.trim()
+            if (pending.length > 2 && stateRef.current === 'listening' && activeRef.current) {
+              console.log('[WakeWord] silence detected → auto-submit:', pending)
+              const q = pending.replace(/(olá|ola|hey|ei|oi)?\s*(noc|nokia|nok)/gi, '').trim()
+              if (q.length > 1) {
+                transcriptRef.current = ''
+                hasInterimRef.current = false
+                set('waiting')
+                onQueryRef.current(q)
+                stopRec()
+              }
+            }
+          }, 1200)
         }
         return
       }
 
       if (!last?.isFinal) return
+
+      // Clear silence detection timer — final result arrived
+      if (silenceTimerRef.current) { clearTimeout(silenceTimerRef.current); silenceTimerRef.current = null }
+      hasInterimRef.current = false
 
       // Use best alternative or check all for wake word (standby mode)
       let raw = last[0].transcript.toLowerCase().trim()
