@@ -1,5 +1,5 @@
 # Tasks: NOC AI Chat
-**Versão:** 3.0 | **Data:** 2026-04-21
+**Versão:** 3.1 | **Data:** 2026-04-21
 
 ---
 
@@ -21,6 +21,8 @@
 - [x] python-multipart: dependência para UploadFile/Form
 - [x] MCPDispatcher: roteamento por prefixo de tool name
 - [x] mcp-zabbix: 8 tools, _enrich_triggers(), multi-cliente
+- [x] Premissa pt-BR: _LANGUAGE_PREMISE no topo de todos os system prompts
+- [x] python-multipart: dependência para UploadFile/Form (stt.py)
 - [x] mcp-datadog: 5 tools, health cacheado
 - [x] mcp-grafana: 2 tools
 - [x] mcp-thousandeyes: 6 tools, API v7
