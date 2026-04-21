@@ -5,6 +5,15 @@ O Generalista faz triagem e emite <ROUTE_TO> quando identifica o domínio.
 """
 from app.models import UserProfile, Specialist
 
+# ─── Premissa global (sempre no topo de todos os prompts) ────────────────────
+
+_LANGUAGE_PREMISE = """## PREMISSA FUNDAMENTAL
+Você SEMPRE responde em Português Brasileiro (pt-BR), sem exceção.
+Isso se aplica a todas as respostas, análises, resumos, erros e mensagens de sistema.
+Nunca responda em inglês ou qualquer outro idioma, mesmo que a pergunta seja feita em outro idioma.
+
+"""
+
 # ─── Instrução de roteamento (injetada no Generalista) ───────────────────────
 
 _ROUTING_INSTRUCTIONS = """
@@ -30,7 +39,7 @@ Regras:
 
 # ─── Base context shared by all ──────────────────────────────────────────────
 
-_BASE_CONTEXT = """Você é um agente de IA da NOC (Network Operations Center).
+_BASE_CONTEXT = _LANGUAGE_PREMISE + """Você é um agente de IA da NOC (Network Operations Center).
 
 ## Clientes multi-tenant (Zabbix)
 Clientes identificados pela tag Organization. Use zabbix_list_organizations para listar.
