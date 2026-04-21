@@ -119,7 +119,7 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
 
       retryCountRef.current += 1
       // Backoff: 300ms normally, longer after repeated failures
-      const delay = Math.min(300 + (retryCountRef.current > 3 ? 500 : 0), 1500)
+      const delay = Math.min(150 + (retryCountRef.current > 3 ? 400 : 0), 1000)
       timerRef.current = setTimeout(() => {
         if (activeRef.current) startRec()
       }, delay)
@@ -130,11 +130,17 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
       console.log('[WakeWord] started | state:', stateRef.current)
     } catch (err) {
       console.warn('[WakeWord] start failed:', err)
-      timerRef.current = setTimeout(() => { if (activeRef.current) startRec() }, 800)
+      timerRef.current = setTimeout(() => { if (activeRef.current) startRec() }, 400)
     }
   }, [isSupported])   // stable - no changing deps
 
   // ── After agent + TTS finish → resume listening ───────────────────────────
+  const ttsWasActiveRef = useRef(false)
+  useEffect(() => {
+    if (ttsState === 'speaking') ttsWasActiveRef.current = true
+    if (ttsState === 'idle')     ttsWasActiveRef.current = false
+  }, [ttsState])
+
   useEffect(() => {
     if (!activeRef.current) return
     if (stateRef.current !== 'waiting' && stateRef.current !== 'speaking') return
@@ -143,7 +149,10 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
       console.log('[WakeWord] → resume listening after response')
       set('listening')
       clearTimer()
-      timerRef.current = setTimeout(startRec, 1200)
+      // If TTS was active, wait for Chrome to release audio context
+      // If no TTS, restart almost immediately
+      const delay = ttsWasActiveRef.current ? 400 : 100
+      timerRef.current = setTimeout(startRec, delay)
     }
   }, [agentState, ttsState, startRec])
 
@@ -154,8 +163,8 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
     retryCountRef.current = 0
     activeRef.current = true
     set('listening')
-    // Small delay ensures browser has processed the click event
-    timerRef.current = setTimeout(startRec, 200)
+    // Minimal delay so browser registers click before mic starts
+    timerRef.current = setTimeout(startRec, 80)
   }, [isSupported, disabled, startRec])
 
   const deactivate = useCallback(() => {
