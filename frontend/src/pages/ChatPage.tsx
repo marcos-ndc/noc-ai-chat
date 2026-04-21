@@ -168,6 +168,7 @@ export function ChatPage() {
               : voiceOutput.state === 'paused'   ? 'paused'
               : 'idle',
     disabled: !isConnected,
+    speak:    voiceOutput.speak,   // for greetings and farewells
   })
 
   // TTS ativado automaticamente via wakeWord.state check no agent_done handler
