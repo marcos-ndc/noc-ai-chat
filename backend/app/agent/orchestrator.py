@@ -134,6 +134,39 @@ def _tool_to_noc_name(tool_name: str) -> Optional[ToolName]:
     return None
 
 
+def _build_handoff_context(session, old_label: str, new_label: str, route_reason: str) -> str:
+    """Constroi resumo de handoff para o novo especialista."""
+    import re as _re
+    from app.models import MessageRole
+
+    MAX_MSGS = 10
+    msgs = session.messages[-MAX_MSGS:]
+
+    lines = []
+    for m in msgs:
+        role = "Analista" if m.role == MessageRole.user else old_label
+        text = _re.sub(r"<ROUTE_TO[^>]*/?>", "", m.content).strip()
+        if len(text) > 400:
+            text = text[:400] + "..."
+        if text:
+            lines.append(f"[{role}]: {text}")
+
+    transcript = "\n".join(lines) if lines else "Sem historico disponivel."
+
+    return (
+        f"## Handoff: Transferencia para {new_label}\n\n"
+        f"**Motivo:** {route_reason}\n\n"
+        f"### Historico da conversa anterior\n\n"
+        f"{transcript}\n\n"
+        f"### Sua missao\n\n"
+        f"Voce esta assumindo este atendimento. Com base no contexto acima:\n"
+        f"1. Consulte imediatamente as ferramentas da sua especialidade\n"
+        f"2. Confirme ou refute: **{route_reason}**\n"
+        f"3. Identifique a causa raiz e recomende acoes\n"
+        f"4. Inicie a investigacao agora sem aguardar nova instrucao do analista"
+    )
+
+
 class AgentOrchestrator:
     def __init__(self) -> None:
         # Client built per-request via process_message to support runtime config changes
@@ -321,21 +354,42 @@ class AgentOrchestrator:
             )
 
             if route_match:
-                new_spec    = route_match.group(1).lower()
+                new_spec     = route_match.group(1).lower()
                 route_reason = route_match.group(2)
                 from app.models import Specialist as _Spec, SPECIALIST_LABELS
                 valid = [s.value for s in _Spec]
                 if new_spec in valid and new_spec != session.active_specialist:
+                    old_spec     = session.active_specialist
+                    old_label    = SPECIALIST_LABELS.get(old_spec, old_spec)
+                    new_label    = SPECIALIST_LABELS.get(new_spec, new_spec)
+
+                    # Build handoff context from conversation history
+                    handoff = _build_handoff_context(
+                        session     = session,
+                        old_spec    = old_spec,
+                        old_label   = old_label,
+                        new_label   = new_label,
+                        route_reason= route_reason,
+                    )
+
+                    # Inject handoff as a user message so new specialist sees it
+                    session.messages.append(
+                        ChatMessage(role=MessageRole.user, content=handoff)
+                    )
                     session.active_specialist = new_spec
+
                     log.info("specialist.route",
-                             specialist=new_spec,
+                             from_specialist=old_spec,
+                             to_specialist=new_spec,
                              reason=route_reason,
                              session_id=session.session_id)
+
                     await session_manager.save_session(session)
+
                     yield WSOutbound(
                         type=WSEventType.specialist_change,
                         specialist=new_spec,
-                        content=SPECIALIST_LABELS.get(new_spec, new_spec),
+                        content=new_label,
                         reason=route_reason,
                     )
             else:
