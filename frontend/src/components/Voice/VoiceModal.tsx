@@ -222,7 +222,7 @@ export function VoiceModal({ state, onClose, transcript }: VoiceModalProps) {
             <span
               className="font-bold tracking-widest select-none"
               style={{
-                fontSize: '2.8rem',
+                fontSize: '2rem',
                 background: 'linear-gradient(135deg, #a5b4fc 0%, #818cf8 40%, #c4b5fd 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -230,7 +230,7 @@ export function VoiceModal({ state, onClose, transcript }: VoiceModalProps) {
                 filter: `drop-shadow(0 0 ${8 + amplitude * 16}px rgba(139,92,246,0.9))`,
               }}
             >
-              AI
+              NDX
             </span>
           </div>
 
