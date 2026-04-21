@@ -234,22 +234,13 @@ class TestIntegrationConfig:
 
     def test_zabbix_mock_mode_without_url(self):
         """Zabbix MCP entra em modo mock quando ZABBIX_URL não está configurado."""
-        old = os.environ.get("ZABBIX_URL", "")
-        os.environ["ZABBIX_URL"] = ""
-        try:
-            mod = _load_server("zabbix")
-            assert mod.MOCK_MODE is True
-        finally:
-            if old:
-                os.environ["ZABBIX_URL"] = old
+        # Module is already loaded without ZABBIX_URL in test env
+        mod = _load_server("zabbix")
+        # MOCK_MODE is set at import time based on env vars
+        # In test environment ZABBIX_URL is not set → MOCK_MODE should be True
+        assert mod.MOCK_MODE is True, "Zabbix should be in mock mode without ZABBIX_URL"
 
     def test_datadog_mock_mode_without_key(self):
         """Datadog MCP entra em modo mock quando DATADOG_API_KEY não está configurado."""
-        old = os.environ.get("DATADOG_API_KEY", "")
-        os.environ["DATADOG_API_KEY"] = ""
-        try:
-            mod = _load_server("datadog")
-            assert mod.MOCK_MODE is True
-        finally:
-            if old:
-                os.environ["DATADOG_API_KEY"] = old
+        mod = _load_server("datadog")
+        assert mod.MOCK_MODE is True, "Datadog should be in mock mode without DATADOG_API_KEY" 

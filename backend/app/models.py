@@ -39,8 +39,9 @@ class WSEventType(str, Enum):
     agent_token  = "agent_token"
     agent_done   = "agent_done"
     tool_start   = "tool_start"
-    tool_end     = "tool_end"
-    error        = "error"
+    tool_end          = "tool_end"
+    specialist_change = "specialist_change"
+    error             = "error"
     ping         = "ping"
     pong         = "pong"
 

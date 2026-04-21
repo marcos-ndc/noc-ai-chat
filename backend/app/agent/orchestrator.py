@@ -9,6 +9,11 @@ from anthropic import AsyncAnthropic
 log = structlog.get_logger()
 
 from app.agent.prompt import get_system_prompt
+from app.agent.ai_config import ai_config_store
+from app.agent.llm_client import (
+    build_anthropic_client, build_openrouter_client,
+    stream_anthropic, stream_openrouter,
+)
 from app.agent.session import session_manager
 from app.models import (
     ChatMessage, MessageRole, SessionData,
@@ -225,7 +230,6 @@ class AgentOrchestrator:
         This is ONE API call per iteration (not two), with real streaming.
         """
         # Load runtime AI config (provider + model + api_key from admin panel)
-        from app.agent.ai_config import ai_config_store
         from app.models import AIProvider
         cfg = await ai_config_store.get()
 
@@ -233,10 +237,11 @@ class AgentOrchestrator:
         base_url = cfg.openrouter_base_url if cfg.provider == AIProvider.openrouter else None
 
         if not api_key:
-            raise ValueError(
-                "API key nao configurada. "
-                "Configure em /admin ou adicione ANTHROPIC_API_KEY no .env."
+            yield WSOutbound(
+                type=WSEventType.error,
+                error="API key nao configurada. Configure em /admin ou adicione ANTHROPIC_API_KEY no .env.",
             )
+            return
 
         session.messages.append(ChatMessage(role=MessageRole.user, content=user_message))
         await session_manager.save_session(session)
@@ -250,10 +255,6 @@ class AgentOrchestrator:
 
         # ── Agentic loop (one stream call per iteration) ──────────────────────
         # Build the right client per provider
-        from app.agent.llm_client import (
-            build_anthropic_client, build_openrouter_client,
-            stream_anthropic, stream_openrouter,
-        )
         from app.models import AIProvider as _AIProvider
         if cfg.provider == _AIProvider.openrouter:
             llm = build_openrouter_client(
@@ -365,11 +366,10 @@ class AgentOrchestrator:
 
                     # Build handoff context from conversation history
                     handoff = _build_handoff_context(
-                        session     = session,
-                        old_spec    = old_spec,
-                        old_label   = old_label,
-                        new_label   = new_label,
-                        route_reason= route_reason,
+                        session      = session,
+                        old_label    = old_label,
+                        new_label    = new_label,
+                        route_reason = route_reason,
                     )
 
                     # Inject handoff as a user message so new specialist sees it

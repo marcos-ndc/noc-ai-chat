@@ -136,33 +136,50 @@ class TestWebSocketMessages:
 
         mock_stream_ctx.text_stream = fake_text_stream()
 
-        # ── Patch settings (singleton — must patch object, not env var) ───────
-        original_key = settings.anthropic_api_key
-        settings.anthropic_api_key = "sk-test-mock-key-for-testing"
+        # ── Patch ai_config_store and llm_client to avoid real API calls ────
+        from app.models import AIConfig, AIProvider
 
-        try:
-            orch = AgentOrchestrator()
-            orch._client = AsyncMock()
-            orch._client.messages.create = AsyncMock(return_value=mock_probe_response)
-            orch._client.messages.stream = MagicMock(return_value=mock_stream_ctx)
+        mock_cfg = AIConfig(
+            provider=AIProvider.anthropic,
+            model="claude-sonnet-4-20250514",
+            api_key="sk-test-mock-key",
+        )
+        mock_store = AsyncMock()
+        mock_store.get = AsyncMock(return_value=mock_cfg)
 
-            session = SessionData(
-                session_id="unit-test-sess",
-                user_id="user-1",
-                user_profile=UserProfile.N2,
+        # Mock the streaming function to return fake tokens
+        async def fake_stream_fn(client, model, max_tokens, temp, system, messages, tools):
+            from types import SimpleNamespace
+            yield "text", "Olá "
+            yield "text", "mundo!"
+            final = SimpleNamespace(
+                stop_reason="end_turn",
+                content=[SimpleNamespace(type="text", text="Olá mundo!")],
             )
+            yield "final", final
 
-            from app.agent.session import session_manager
-            session_manager.redis = mock_redis
+        orch = AgentOrchestrator()
+
+        session = SessionData(
+            session_id="unit-test-sess",
+            user_id="user-1",
+            user_profile=UserProfile.N2,
+        )
+
+        from app.agent.session import session_manager
+        session_manager.redis = mock_redis
+
+        with patch("app.agent.orchestrator.ai_config_store", mock_store), \
+             patch("app.agent.orchestrator.stream_anthropic", fake_stream_fn), \
+             patch("app.agent.orchestrator.build_anthropic_client", return_value=AsyncMock()):
 
             events = []
             async for event in orch.process_message("Olá agente", session):
                 events.append(event)
 
-            types = [e.type for e in events]
-            assert WSEventType.agent_token in types, f"No agent_token in {types}"
-            assert WSEventType.agent_done  in types, f"No agent_done in {types}"
-            tokens = [e.content for e in events if e.type == WSEventType.agent_token]
-            assert len(tokens) > 0
-        finally:
-            settings.anthropic_api_key = original_key
+        types = [e.type for e in events]
+        assert WSEventType.agent_token in types, f"No agent_token in {types}"
+        assert WSEventType.agent_done  in types, f"No agent_done in {types}"
+        tokens = [e.content for e in events if e.type == WSEventType.agent_token]
+        assert len(tokens) > 0
+
