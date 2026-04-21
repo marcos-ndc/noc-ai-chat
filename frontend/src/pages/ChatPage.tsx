@@ -6,6 +6,7 @@ import { StatusIndicator } from '../components/StatusIndicator/StatusIndicator'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useVoiceOutput } from '../hooks/useVoiceOutput'
 import { useWakeWord } from '../hooks/useWakeWord'
+import { VoiceModal } from '../components/Voice/VoiceModal'
 import { useAuth, useAuthStore } from '../hooks/useAuth'
 import type { Message, ToolName, WSEvent } from '../types'
 
@@ -249,6 +250,11 @@ export function ChatPage() {
               ? 'Agente processando...'
               : 'Pergunte sobre incidentes, alertas, métricas...'
         }
+      />
+      {/* Voice modal overlay */}
+      <VoiceModal
+        state={wakeWord.state}
+        onClose={wakeWord.deactivate}
       />
     </div>
   )
