@@ -159,7 +159,7 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
   }, [isSupported, disabled, startRec])
 
   const deactivate = useCallback(() => {
-    console.log('[WakeWord] deactivating')
+    console.log('[WakeWord] deactivating', new Error().stack?.split('\n').slice(1,4).join(' | '))
     activeRef.current = false
     clearTimer()
     stopRec()
