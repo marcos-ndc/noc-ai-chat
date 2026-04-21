@@ -311,15 +311,24 @@ export function useWakeWord({ onQuery, agentState, ttsState, disabled = false }:
   useEffect(() => {
     console.log('[WakeWord] state check:', stateRef.current, 'agent:', agentState, 'tts:', ttsState, 'active:', activeRef.current)
     if (!activeRef.current) return
-    if (stateRef.current !== 'waiting' && stateRef.current !== 'speaking') return
+    // Handle: waiting/speaking state when agent+TTS finish → resume
+    // Also handle: listening state where TTS interrupted mic → restart
+    const needsResume = (
+      stateRef.current === 'waiting' ||
+      stateRef.current === 'speaking' ||
+      (stateRef.current === 'listening' && !recRef.current)  // mic was aborted by TTS
+    )
+    if (!needsResume) return
     if (ttsState === 'speaking') { if (stateRef.current !== 'speaking') set('speaking'); return }
+    if (ttsState === 'paused') return  // wait for paused → idle
     if (agentState === 'idle' && ttsState === 'idle') {
-      console.log('[WakeWord] → resume listening after response, whisper:', whisper.isPremium)
+      console.log('[WakeWord] → resume listening, whisper:', whisper.isPremium, 'prev state:', stateRef.current)
       set('listening')
       clearTimer()
       const delay = ttsWasActiveRef.current ? 600 : 150
       timerRef.current = setTimeout(() => {
         if (!activeRef.current) return
+        if (recRef.current) return  // already recording
         if (whisper.isPremium) {
           whisperListenRef.current()
         } else {
