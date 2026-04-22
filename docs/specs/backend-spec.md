@@ -93,3 +93,46 @@
 | ROUTE_TO cleanup | Tag XML removida do histórico armazenado |
 | _enrich_triggers | Função chamada mas nunca definida no mcp-zabbix |
 | python-multipart | Ausente — FastAPI não processa UploadFile sem ele |
+
+---
+
+## Segurança (v3.2)
+
+### Row Level Security
+```python
+# websocket/handler.py — get_or_create_session()
+if session.user_id != user.id:
+    raise PermissionError("Session belongs to a different user")
+```
+
+### Auth Dependency
+```python
+# app/auth/dependencies.py
+from app.auth.dependencies import get_current_user, require_admin
+
+# Em qualquer router:
+async def meu_endpoint(_: UserOut = Depends(get_current_user)): ...
+async def admin_endpoint(_: UserOut = Depends(require_admin)): ...
+```
+
+### Security Headers Middleware
+Injetado em `main.py` via `SecurityHeadersMiddleware(BaseHTTPMiddleware)`.
+Em produção (`CORS_ALLOW_ALL=false`), adiciona também `Content-Security-Policy` e `HSTS`.
+
+### CORS Produção
+```env
+CORS_ALLOW_ALL=false
+CORS_ORIGINS=["https://noc.suaempresa.com"]
+APP_DOMAIN=noc.suaempresa.com
+```
+
+### TTS/STT — Leitura de env a cada request
+```python
+def _cfg():
+    return {
+        "openai_key": os.getenv("OPENAI_API_KEY", ""),
+        "el_key":     os.getenv("ELEVENLABS_API_KEY", ""),
+        ...
+    }
+```
+Padrão obrigatório: nunca ler env vars no nível de módulo para TTS/STT.
