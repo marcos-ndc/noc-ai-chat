@@ -223,6 +223,20 @@ async def list_voices():
     return result
 
 
+@router.get("/debug")
+async def tts_debug():
+    """Debug: mostra quais variáveis de ambiente o backend está lendo."""
+    import os
+    return {
+        "OPENAI_API_KEY":      "✅ configurada" if os.getenv("OPENAI_API_KEY") else "❌ vazia",
+        "ELEVENLABS_API_KEY":  "✅ configurada" if os.getenv("ELEVENLABS_API_KEY") else "❌ vazia",
+        "ELEVENLABS_MODEL":    os.getenv("ELEVENLABS_MODEL", "não definida"),
+        "ELEVENLABS_VOICE_ID": os.getenv("ELEVENLABS_VOICE_ID", "não definida"),
+        "TTS_VOICE":           os.getenv("TTS_VOICE", "não definida"),
+        "TTS_MODEL":           os.getenv("TTS_MODEL", "não definida"),
+        "_cfg()": str(_cfg()),
+    }
+
 @router.get("/status")
 async def tts_status():
     c        = _cfg()
