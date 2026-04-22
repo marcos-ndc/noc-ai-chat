@@ -9,7 +9,9 @@ API keys ficam no servidor — nunca expostas ao frontend.
 """
 import os
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from app.auth.dependencies import get_current_user
+from app.models import UserOut
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -82,7 +84,7 @@ class TTSRequest(BaseModel):
 
 
 @router.post("/speak", response_class=Response)
-async def speak(req: TTSRequest):
+async def speak(req: TTSRequest, _: UserOut = Depends(get_current_user)):
     """Converte texto em fala. Suporta OpenAI TTS e ElevenLabs."""
     c    = _cfg()
     text = req.text[:4000].strip()
@@ -159,7 +161,7 @@ async def _speak_elevenlabs(text: str, voice_id: str, model: str, c: dict | None
 
 
 @router.get("/voices")
-async def list_voices():
+async def list_voices(_: UserOut = Depends(get_current_user)):
     """Lista todas as vozes disponíveis (OpenAI + ElevenLabs pt-BR)."""
     c = _cfg()
     result: dict = {
@@ -232,7 +234,7 @@ async def list_voices():
 
 
 @router.get("/status")
-async def tts_status():
+async def tts_status(_: UserOut = Depends(get_current_user)):
     c        = _cfg()
     provider = "elevenlabs" if c["el_key"] else ("openai" if c["openai_key"] else "browser")
     voice    = c["el_voice_id"] or list(ELEVENLABS_PTBR_PRESETS.values())[0]["id"] if c["el_key"] else c["tts_voice"]

@@ -5,8 +5,11 @@ que a Web Speech API do Chrome. Resistente a ruído, suporte nativo pt-BR.
 """
 import os
 import httpx
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import JSONResponse
+
+from app.auth.dependencies import get_current_user
+from app.models import UserOut
 
 router = APIRouter(prefix="/stt", tags=["stt"])
 
@@ -29,6 +32,7 @@ WHISPER_LANG    = os.getenv("WHISPER_LANG", "pt")   # força pt-BR, evita confus
 
 @router.post("/transcribe")
 async def transcribe(
+    _user: UserOut = Depends(get_current_user),
     audio: UploadFile = File(...),
     prompt: str = Form(default="NOC, Zabbix, Datadog, ThousandEyes, Grafana, alerta, incidente, latência, disponibilidade"),
 ):
@@ -80,7 +84,7 @@ async def transcribe(
 
 
 @router.get("/status")
-async def stt_status():
+async def stt_status(_: UserOut = Depends(get_current_user)):
     """Verifica disponibilidade do STT premium."""
     c = _stt_cfg()
     return {
