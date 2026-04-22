@@ -16,19 +16,31 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/tts", tags=["tts"])
 
 # ── OpenAI TTS ────────────────────────────────────────────────────────────────
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_TTS_URL = "https://api.openai.com/v1/audio/speech"
+EL_BASE_URL    = "https://api.elevenlabs.io/v1"
+
+# Read at request time so hot-reload picks up new env vars
+def _cfg():
+    return {
+        "openai_key":  os.getenv("OPENAI_API_KEY", ""),
+        "tts_voice":   os.getenv("TTS_VOICE",  "onyx"),
+        "tts_model":   os.getenv("TTS_MODEL",  "tts-1-hd"),
+        "tts_speed":   float(os.getenv("TTS_SPEED", "0.92")),
+        "el_key":      os.getenv("ELEVENLABS_API_KEY", ""),
+        "el_model":    os.getenv("ELEVENLABS_MODEL", "eleven_flash_v2_5"),
+        "el_voice_id": os.getenv("ELEVENLABS_VOICE_ID", ""),
+        "ssl_verify":  os.getenv("ANTHROPIC_SSL_VERIFY", "true").lower() != "false",
+    }
+
+# Module-level aliases for backward compat (refreshed per-request via _cfg())
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 TTS_VOICE      = os.getenv("TTS_VOICE",  "onyx")
 TTS_MODEL      = os.getenv("TTS_MODEL",  "tts-1-hd")
 TTS_SPEED      = float(os.getenv("TTS_SPEED", "0.92"))
-
-# ── ElevenLabs TTS ────────────────────────────────────────────────────────────
 EL_API_KEY     = os.getenv("ELEVENLABS_API_KEY", "")
-EL_MODEL       = os.getenv("ELEVENLABS_MODEL",    "eleven_flash_v2_5")
+EL_MODEL       = os.getenv("ELEVENLABS_MODEL", "eleven_flash_v2_5")
 EL_VOICE_ID    = os.getenv("ELEVENLABS_VOICE_ID", "")
-EL_BASE_URL    = "https://api.elevenlabs.io/v1"
-
-SSL_VERIFY = os.getenv("ANTHROPIC_SSL_VERIFY", "true").lower() != "false"
+SSL_VERIFY     = os.getenv("ANTHROPIC_SSL_VERIFY", "true").lower() != "false"
 
 # ── Vozes pt-BR recomendadas (IDs buscados via API na sua conta) ──────────────
 # Esses são IDs da Voice Library pública do ElevenLabs para pt-BR
@@ -65,46 +77,54 @@ class TTSRequest(BaseModel):
 @router.post("/speak", response_class=Response)
 async def speak(req: TTSRequest):
     """Converte texto em fala. Suporta OpenAI TTS e ElevenLabs."""
+    c    = _cfg()
     text = req.text[:4000].strip()
     if not text:
         raise HTTPException(status_code=400, detail="Texto vazio")
 
-    if req.provider == "elevenlabs":
-        return await _speak_elevenlabs(text, req.voice, req.model)
+    # Auto-select provider: ElevenLabs if key available and not forced to openai
+    provider = req.provider
+    if not provider or provider == "auto":
+        provider = "elevenlabs" if c["el_key"] else "openai"
+
+    if provider == "elevenlabs":
+        return await _speak_elevenlabs(text, req.voice, req.model, c)
     else:
-        return await _speak_openai(text, req.voice, req.speed, req.model)
+        return await _speak_openai(text, req.voice, req.speed, req.model, c)
 
 
-async def _speak_openai(text: str, voice: str, speed: float, model: str) -> Response:
-    if not OPENAI_API_KEY:
+async def _speak_openai(text: str, voice: str, speed: float, model: str, c: dict | None = None) -> Response:
+    c = c or _cfg()
+    if not c["openai_key"]:
         raise HTTPException(status_code=503, detail="OPENAI_API_KEY não configurada")
 
-    v = voice if voice in OPENAI_VOICES else TTS_VOICE
-    m = model if model in ("tts-1", "tts-1-hd") else TTS_MODEL
+    v = voice if voice in OPENAI_VOICES else c["tts_voice"]
+    m = model if model in ("tts-1", "tts-1-hd") else c["tts_model"]
 
-    async with httpx.AsyncClient(timeout=30.0, verify=SSL_VERIFY) as client:
+    async with httpx.AsyncClient(timeout=30.0, verify=c["ssl_verify"]) as client:
         resp = await client.post(
             OPENAI_TTS_URL,
             headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
-            json={"model": m, "input": text, "voice": v, "speed": speed, "response_format": "mp3"},
+            json={"model": m, "input": text, "voice": v, "speed": speed or c["tts_speed"], "response_format": "mp3"},
         )
         resp.raise_for_status()
         return Response(content=resp.content, media_type="audio/mpeg",
                         headers={"X-TTS-Provider": "openai", "X-TTS-Voice": v})
 
 
-async def _speak_elevenlabs(text: str, voice_id: str, model: str) -> Response:
-    if not EL_API_KEY:
+async def _speak_elevenlabs(text: str, voice_id: str, model: str, c: dict | None = None) -> Response:
+    c = c or _cfg()
+    if not c["el_key"]:
         raise HTTPException(status_code=503, detail="ELEVENLABS_API_KEY não configurada")
 
-    vid = voice_id or EL_VOICE_ID or list(ELEVENLABS_PTBR_PRESETS.values())[0]["id"]
-    mid = model or EL_MODEL
+    vid = voice_id or c["el_voice_id"] or list(ELEVENLABS_PTBR_PRESETS.values())[0]["id"]
+    mid = model or c["el_model"]
 
     url = f"{EL_BASE_URL}/text-to-speech/{vid}"
-    async with httpx.AsyncClient(timeout=30.0, verify=SSL_VERIFY) as client:
+    async with httpx.AsyncClient(timeout=30.0, verify=c["ssl_verify"]) as client:
         resp = await client.post(
             url,
-            headers={"xi-api-key": EL_API_KEY, "Content-Type": "application/json"},
+            headers={"xi-api-key": c["el_key"], "Content-Type": "application/json"},
             json={
                 "text":     text,
                 "model_id": mid,
@@ -120,18 +140,19 @@ async def _speak_elevenlabs(text: str, voice_id: str, model: str) -> Response:
 @router.get("/voices")
 async def list_voices():
     """Lista todas as vozes disponíveis (OpenAI + ElevenLabs pt-BR)."""
+    c = _cfg()
     result: dict = {
         "openai": {
-            "available": bool(OPENAI_API_KEY),
+            "available": bool(c["openai_key"]),
             "default_voice": TTS_VOICE,
             "default_model": TTS_MODEL,
             "voices": OPENAI_VOICES,
             "models": {"tts-1": "Rápido", "tts-1-hd": "Alta qualidade (recomendado)"},
         },
         "elevenlabs": {
-            "available": bool(EL_API_KEY),
-            "default_voice_id": EL_VOICE_ID,
-            "default_model": EL_MODEL,
+            "available": bool(c["el_key"]),
+            "default_voice_id": c["el_voice_id"],
+            "default_model": c["el_model"],
             "voices": {},
             "models": {
                 "eleven_flash_v2_5": "Flash — ultra-baixa latência ~75ms (recomendado para NOC)",
@@ -142,12 +163,12 @@ async def list_voices():
     }
 
     # Fetch voices from ElevenLabs API if key is configured
-    if EL_API_KEY:
+    if c["el_key"]:
         try:
             async with httpx.AsyncClient(timeout=10.0, verify=SSL_VERIFY) as client:
                 r = await client.get(
                     f"{EL_BASE_URL}/voices",
-                    headers={"xi-api-key": EL_API_KEY},
+                    headers={"xi-api-key": c["el_key"]},
                 )
                 if r.status_code == 200:
                     data = r.json()
@@ -187,13 +208,14 @@ async def list_voices():
 
 @router.get("/status")
 async def tts_status():
-    provider = "elevenlabs" if EL_API_KEY else ("openai" if OPENAI_API_KEY else "browser")
-    voice    = EL_VOICE_ID or list(ELEVENLABS_PTBR_PRESETS.values())[0]["id"] if EL_API_KEY else TTS_VOICE
-    model    = EL_MODEL if EL_API_KEY else TTS_MODEL
+    c        = _cfg()
+    provider = "elevenlabs" if c["el_key"] else ("openai" if c["openai_key"] else "browser")
+    voice    = c["el_voice_id"] or list(ELEVENLABS_PTBR_PRESETS.values())[0]["id"] if c["el_key"] else c["tts_voice"]
+    model    = c["el_model"] if c["el_key"] else c["tts_model"]
     return {
-        "openai":          bool(OPENAI_API_KEY),
-        "elevenlabs":      bool(EL_API_KEY),
-        "available":       bool(OPENAI_API_KEY or EL_API_KEY),
+        "openai":          bool(c["openai_key"]),
+        "elevenlabs":      bool(c["el_key"]),
+        "available":       bool(c["openai_key"] or c["el_key"]),
         "default_provider": provider,
         "voice":           voice,
         "model":           model,
