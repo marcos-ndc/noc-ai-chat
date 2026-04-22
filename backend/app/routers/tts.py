@@ -186,27 +186,27 @@ async def list_voices():
                 if r.status_code == 200:
                     data = r.json()
                     voices = {}
+                    # Build a set of all voice IDs from account
+                    account_ids = {v["voice_id"] for v in data.get("voices", [])}
+                    # Add account voices
                     for v in data.get("voices", []):
                         labels = v.get("labels", {})
-                        lang   = labels.get("language", "").lower()
-                        # Include pt-BR voices + presets
-                        if "portuguese" in lang or "brazilian" in lang or "pt" in lang \
-                           or v["name"] in ELEVENLABS_PTBR_PRESETS:
-                            voices[v["voice_id"]] = {
-                                "name":   v["name"],
-                                "desc":   v.get("description", labels.get("description", "")),
-                                "gender": labels.get("gender", ""),
-                                "accent": labels.get("accent", ""),
-                            }
-                    # Always include ALL presets (custom voices from account + premade)
-                    for name, info in ELEVENLABS_PTBR_PRESETS.items():
+                        voices[v["voice_id"]] = {
+                            "name":   v["name"],
+                            "desc":   v.get("description", labels.get("description", "")),
+                            "gender": labels.get("gender", ""),
+                            "accent": labels.get("accent", ""),
+                        }
+                    # Always add ALL presets — if already in account, enrich with real name
+                    for preset_name, info in ELEVENLABS_PTBR_PRESETS.items():
                         vid = info["id"]
                         if vid in voices:
-                            # Enrich preset with real name from API if available
-                            voices[vid]["preset_name"] = name
+                            # Voice is in account — keep real name, add preset label
+                            voices[vid]["preset_label"] = preset_name
                         else:
+                            # Not in account yet — add as preset
                             voices[vid] = {
-                                "name":   name,
+                                "name":   preset_name,
                                 "desc":   info["desc"],
                                 "gender": info["gender"],
                                 "accent": "Brasileiro",

@@ -8,6 +8,7 @@
  *    Ativa automaticamente se OPENAI_API_KEY não configurada no servidor
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAuthStore } from './useAuth'
 import type { VoiceOutputState } from '../types'
 
 const API_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
@@ -61,6 +62,7 @@ interface UseVoiceOutputReturn {
 }
 
 export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
+  const token = useAuthStore(s => s.token)
   const [state, setState] = useState<VoiceOutputState>('idle')
   const [ttsStatus, setTtsStatus] = useState<TTSStatus | null>(null)
   // Persist voice settings in sessionStorage so admin panel changes apply to chat
@@ -90,7 +92,8 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
 
   // ── Check OpenAI TTS availability on mount ────────────────────────────────
   useEffect(() => {
-    fetch(`${API_URL}/tts/voices`)
+    const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+    fetch(`${API_URL}/tts/voices`, { headers: authHeaders })
       .then(r => r.json())
       .then((rawData: any) => {
         // Ensure root-level available is computed from providers
@@ -154,7 +157,10 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
     try {
       const resp = await fetch(`${API_URL}/tts/speak`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           text,
           provider: selectedProvider,
