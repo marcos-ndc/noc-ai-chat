@@ -69,6 +69,22 @@ async def get_or_create_session(session_id: str, user: UserOut) -> SessionData:
             user_profile=user.profile,
         )
         await session_manager.save_session(session)
+        return session
+
+    # ── Row Level Security ────────────────────────────────────────────────────
+    # Verify the session belongs to the authenticated user.
+    # Prevents a user from hijacking another user's session by guessing the ID.
+    if session.user_id != user.id:
+        log.warning(
+            "rls.session_access_denied",
+            session_id=session_id,
+            session_owner=session.user_id,
+            requesting_user=user.id,
+        )
+        raise PermissionError(
+            f"Session {session_id} belongs to a different user"
+        )
+
     return session
 
 
@@ -104,7 +120,14 @@ async def handle_chat_websocket(ws: WebSocket) -> None:
 
             # Resolve session
             session_id = inbound.sessionId or connection_id
-            session = await get_or_create_session(session_id, user)
+            try:
+                session = await get_or_create_session(session_id, user)
+            except PermissionError as e:
+                await ws.send_json(WSOutbound(
+                    type=WSEventType.error,
+                    error="Acesso negado: sessão pertence a outro usuário",
+                ).model_dump())
+                continue
 
             # Manual specialist selection
             if inbound.specialist and inbound.specialist != session.active_specialist:

@@ -53,7 +53,10 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
     ]
-    cors_allow_all: bool = True  # True em dev, False em produção
+    cors_allow_all: bool = True   # True em dev, False em produção
+    # Em produção, defina o domínio da aplicação:
+    # APP_DOMAIN=noc.suaempresa.com
+    app_domain: str = ""          # usado nos security headers em prod
 
 
 settings = Settings()
