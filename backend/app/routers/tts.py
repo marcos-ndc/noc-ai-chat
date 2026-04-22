@@ -33,11 +33,15 @@ SSL_VERIFY = os.getenv("ANTHROPIC_SSL_VERIFY", "true").lower() != "false"
 # ── Vozes pt-BR recomendadas (IDs buscados via API na sua conta) ──────────────
 # Esses são IDs da Voice Library pública do ElevenLabs para pt-BR
 # O endpoint /tts/voices busca os disponíveis na sua conta
+# Vozes built-in do ElevenLabs disponíveis em TODOS os planos (premade voices)
+# Funcionam bem com pt-BR usando eleven_multilingual_v2 ou eleven_flash_v2_5
 ELEVENLABS_PTBR_PRESETS = {
-    "Roberta":       {"id": "XB0fDUnXU5powFXDhCwa", "gender": "feminino",  "desc": "Jovem e amigável — ideal para conversação"},
-    "Rafael Valente": {"id": "z9fAnlkpzviPz146aGWa", "gender": "masculino", "desc": "Narrador profissional brasileiro — voz cativante"},
-    "Borges":        {"id": "pMsXgVXv3BLzUgSXRplE", "gender": "masculino", "desc": "Voz jornalística calma — bom para NOC"},
-    "Raquel":        {"id": "ODq5zmih8GrVes37Dizd", "gender": "feminino",  "desc": "Expressiva e jovial — conversacional"},
+    "Liam":   {"id": "TX3LPaxmHKxFdv7VOQHJ", "gender": "masculino", "desc": "Jovem masculino — direto e natural"},
+    "Laura":  {"id": "FGY2WhTYpPnrIDTdsKH5", "gender": "feminino",  "desc": "Jovem feminina — conversacional e clara"},
+    "Charlie":{"id": "IKne3meq5aSn9XLyUdCD", "gender": "masculino", "desc": "Masculina casual — natural em pt-BR"},
+    "Alice":  {"id": "Xb7hH8MSUJpSbSDYk0k2", "gender": "feminino",  "desc": "Feminina expressiva — boa pronúncia"},
+    "George": {"id": "JBFqnCBsd6RMkjVDRZzb", "gender": "masculino", "desc": "Voz grave e autoritativa — estilo NOC"},
+    "Matilda":{"id": "XrExE9yKIg1WjnnlVkGX", "gender": "feminino",  "desc": "Feminina amigável e fluente"},
 }
 
 OPENAI_VOICES = {
@@ -183,9 +187,15 @@ async def list_voices():
 
 @router.get("/status")
 async def tts_status():
+    provider = "elevenlabs" if EL_API_KEY else ("openai" if OPENAI_API_KEY else "browser")
+    voice    = EL_VOICE_ID or list(ELEVENLABS_PTBR_PRESETS.values())[0]["id"] if EL_API_KEY else TTS_VOICE
+    model    = EL_MODEL if EL_API_KEY else TTS_MODEL
     return {
-        "openai":      bool(OPENAI_API_KEY),
-        "elevenlabs":  bool(EL_API_KEY),
-        "available":   bool(OPENAI_API_KEY or EL_API_KEY),
-        "default_provider": "elevenlabs" if EL_API_KEY else ("openai" if OPENAI_API_KEY else "browser"),
+        "openai":          bool(OPENAI_API_KEY),
+        "elevenlabs":      bool(EL_API_KEY),
+        "available":       bool(OPENAI_API_KEY or EL_API_KEY),
+        "default_provider": provider,
+        "voice":           voice,
+        "model":           model,
+        "speed":           TTS_SPEED,
     }
