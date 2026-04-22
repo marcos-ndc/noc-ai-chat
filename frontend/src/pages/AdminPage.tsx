@@ -191,13 +191,20 @@ export function AdminPage() {
       api.get('/admin/ai-config'),
       api.get('/admin/models'),
       api.get('/admin/status'),
-      api.get('/tts/status'),
+      api.get('/tts/voices'),
     ]).then(([cfg, mdls, st, tts]) => {
       setTtsInfo(tts)
-      if (tts?.available) {
-        setTtsVoice(tts.voice)
-        setTtsModel(tts.model)
-        setTtsSpeed(tts.speed)
+      // Detect active provider and pre-select voice/model
+      const provider = tts?.elevenlabs?.available ? 'elevenlabs' : 'openai'
+      setTtsProvider(provider)
+      if (provider === 'elevenlabs') {
+        const firstVoice = Object.keys(tts?.elevenlabs?.voices ?? {})[0] ?? ''
+        setTtsVoice(firstVoice)
+        setTtsModel(tts?.elevenlabs?.default_model ?? 'eleven_flash_v2_5')
+      } else if (tts?.openai?.available) {
+        setTtsVoice(tts?.openai?.default_voice ?? 'onyx')
+        setTtsModel(tts?.openai?.default_model ?? 'tts-1-hd')
+        setTtsSpeed(tts?.openai?.default_speed ?? 0.92)
       }
       setConfig(cfg)
       setModels(mdls)
