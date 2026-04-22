@@ -41,6 +41,13 @@ services:
       - MCP_DATADOG_URL=http://mcp-datadog:8001
       - MCP_GRAFANA_URL=http://mcp-grafana:8001
       - MCP_THOUSANDEYES_URL=http://mcp-thousandeyes:8001
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - TTS_VOICE=${TTS_VOICE:-onyx}
+      - TTS_MODEL=${TTS_MODEL:-tts-1-hd}
+      - TTS_SPEED=${TTS_SPEED:-0.92}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - ELEVENLABS_MODEL=${ELEVENLABS_MODEL:-eleven_flash_v2_5}
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-}
 
   mcp-zabbix:
     build:
