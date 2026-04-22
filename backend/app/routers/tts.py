@@ -75,9 +75,9 @@ OPENAI_VOICES = {
 
 class TTSRequest(BaseModel):
     text:     str
-    provider: str   = "openai"   # "openai" | "elevenlabs"
-    voice:    str   = ""         # voice name/id
-    speed:    float = TTS_SPEED
+    provider: str   = ""    # "openai" | "elevenlabs" | "" = auto-select
+    voice:    str   = ""    # voice name/id
+    speed:    float = 0.92  # will be overridden by _cfg() in handler
     model:    str   = ""
 
 
@@ -114,7 +114,10 @@ async def _speak_openai(text: str, voice: str, speed: float, model: str, c: dict
             headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
             json={"model": m, "input": text, "voice": v, "speed": speed or c["tts_speed"], "response_format": "mp3"},
         )
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            detail = resp.text[:300] if resp.text else f"HTTP {resp.status_code}"
+            raise HTTPException(status_code=resp.status_code,
+                                detail=f"OpenAI TTS error: {detail}")
         return Response(content=resp.content, media_type="audio/mpeg",
                         headers={"X-TTS-Provider": "openai", "X-TTS-Voice": v})
 
@@ -136,10 +139,13 @@ async def _speak_elevenlabs(text: str, voice_id: str, model: str, c: dict | None
                 "text":     text,
                 "model_id": mid,
                 "voice_settings": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.0},
-                "language_code": "pt",
+                # language_code omitted — eleven_flash_v2_5 auto-detects pt-BR from text
             },
         )
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            detail = resp.text[:300] if resp.text else f"HTTP {resp.status_code}"
+            raise HTTPException(status_code=resp.status_code,
+                                detail=f"ElevenLabs error: {detail}")
         return Response(content=resp.content, media_type="audio/mpeg",
                         headers={"X-TTS-Provider": "elevenlabs", "X-TTS-Voice": vid})
 

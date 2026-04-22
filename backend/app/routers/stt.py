@@ -10,8 +10,18 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/stt", tags=["stt"])
 
+OPENAI_STT_URL = "https://api.openai.com/v1/audio/transcriptions"
+
+def _stt_cfg():
+    return {
+        "key":        os.getenv("OPENAI_API_KEY", ""),
+        "ssl_verify": os.getenv("ANTHROPIC_SSL_VERIFY", "true").lower() != "false",
+        "model":      os.getenv("WHISPER_MODEL", "whisper-1"),
+        "lang":       os.getenv("WHISPER_LANG", "pt"),
+    }
+
+# Backward compat aliases
 OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY", "")
-OPENAI_STT_URL  = "https://api.openai.com/v1/audio/transcriptions"
 SSL_VERIFY      = os.getenv("ANTHROPIC_SSL_VERIFY", "true").lower() != "false"
 WHISPER_MODEL   = os.getenv("WHISPER_MODEL", "whisper-1")
 WHISPER_LANG    = os.getenv("WHISPER_LANG", "pt")   # força pt-BR, evita confusão com outros idiomas
@@ -27,7 +37,8 @@ async def transcribe(
     O parâmetro 'prompt' ajuda o Whisper a reconhecer termos técnicos NOC.
     Retorna: { text: str, language: str, duration: float }
     """
-    if not OPENAI_API_KEY:
+    c = _stt_cfg()
+    if not c["key"]:
         raise HTTPException(
             status_code=503,
             detail="OPENAI_API_KEY não configurada. Configure no .env para usar transcrição premium."
@@ -41,14 +52,14 @@ async def transcribe(
     filename = audio.filename or "audio.webm"
 
     try:
-        async with httpx.AsyncClient(timeout=30.0, verify=SSL_VERIFY) as client:
+        async with httpx.AsyncClient(timeout=30.0, verify=c["ssl_verify"]) as client:
             resp = await client.post(
                 OPENAI_STT_URL,
-                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                headers={"Authorization": f"Bearer {c['key']}"},
                 files={"file": (filename, audio_bytes, audio.content_type or "audio/webm")},
                 data={
-                    "model":           WHISPER_MODEL,
-                    "language":        WHISPER_LANG,
+                    "model":           c["model"],
+                    "language":        c["lang"],
                     "prompt":          prompt,
                     "response_format": "verbose_json",
                 },
@@ -71,9 +82,10 @@ async def transcribe(
 @router.get("/status")
 async def stt_status():
     """Verifica disponibilidade do STT premium."""
+    c = _stt_cfg()
     return {
-        "available": bool(OPENAI_API_KEY),
-        "model":     WHISPER_MODEL,
-        "language":  WHISPER_LANG,
+        "available": bool(c["key"]),
+        "model":     c["model"],
+        "language":  c["lang"],
         "provider":  "OpenAI Whisper",
     }
