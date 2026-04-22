@@ -68,7 +68,7 @@ OPENAI_VOICES = {
     "echo":    {"label": "Echo",    "desc": "Masculina equilibrada — boa dicção",   "gender": "masculino"},
     "fable":   {"label": "Fable",   "desc": "Expressiva — boa para narrativas",     "gender": "masculino"},
     "alloy":   {"label": "Alloy",   "desc": "Neutra e clara",                       "gender": "neutro"},
-    "nova":    {"label": "Nova",    "desc": "Feminina natural — pt-BR melhor",      "gender": "feminino"},
+    "nova":    {"label": "Nova ⭐",  "desc": "Feminina natural — melhor para pt-BR", "gender": "feminino"},
     "shimmer": {"label": "Shimmer", "desc": "Feminina suave e acolhedora",          "gender": "feminino"},
 }
 
@@ -95,7 +95,15 @@ async def speak(req: TTSRequest):
         provider = "elevenlabs" if c["el_key"] else "openai"
 
     if provider == "elevenlabs":
-        return await _speak_elevenlabs(text, req.voice, req.model, c)
+        try:
+            return await _speak_elevenlabs(text, req.voice, req.model, c)
+        except HTTPException as e:
+            # Fallback to OpenAI if ElevenLabs fails (proxy block, network issue, etc.)
+            import logging
+            logging.warning(f"ElevenLabs failed ({e.detail}), falling back to OpenAI")
+            if not c["openai_key"]:
+                raise
+            return await _speak_openai(text, req.voice, req.speed, req.model, c)
     else:
         return await _speak_openai(text, req.voice, req.speed, req.model, c)
 
@@ -222,20 +230,6 @@ async def list_voices():
 
     return result
 
-
-@router.get("/debug")
-async def tts_debug():
-    """Debug: mostra quais variáveis de ambiente o backend está lendo."""
-    import os
-    return {
-        "OPENAI_API_KEY":      "✅ configurada" if os.getenv("OPENAI_API_KEY") else "❌ vazia",
-        "ELEVENLABS_API_KEY":  "✅ configurada" if os.getenv("ELEVENLABS_API_KEY") else "❌ vazia",
-        "ELEVENLABS_MODEL":    os.getenv("ELEVENLABS_MODEL", "não definida"),
-        "ELEVENLABS_VOICE_ID": os.getenv("ELEVENLABS_VOICE_ID", "não definida"),
-        "TTS_VOICE":           os.getenv("TTS_VOICE", "não definida"),
-        "TTS_MODEL":           os.getenv("TTS_MODEL", "não definida"),
-        "_cfg()": str(_cfg()),
-    }
 
 @router.get("/status")
 async def tts_status():
