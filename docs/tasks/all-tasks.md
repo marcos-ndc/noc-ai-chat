@@ -1,5 +1,5 @@
 # Tasks: NOC AI Chat
-**Versão:** 3.1 | **Data:** 2026-04-21
+**Versão:** 3.2 | **Data:** 2026-04-22
 
 ---
 
@@ -23,6 +23,13 @@
 - [x] mcp-zabbix: 8 tools, _enrich_triggers(), multi-cliente
 - [x] Premissa pt-BR: _LANGUAGE_PREMISE no topo de todos os system prompts
 - [x] python-multipart: dependência para UploadFile/Form (stt.py)
+- [x] specialist_change adicionado ao WSEventType enum
+- [x] _build_handoff_context: resumo dos últimos 10 turnos injetado ao novo especialista
+- [x] ElevenLabs TTS: suporte multi-provedor, fallback automático para OpenAI
+- [x] _cfg(): env vars lidas a cada request (tts.py + stt.py)
+- [x] Security hardening: RLS, CORS restrito, security headers, auth em TTS/STT
+- [x] auth/dependencies.py: get_current_user + require_admin reutilizáveis
+- [x] SecurityHeadersMiddleware: X-Frame-Options, CSP, HSTS, Permissions-Policy
 - [x] mcp-datadog: 5 tools, health cacheado
 - [x] mcp-grafana: 2 tools
 - [x] mcp-thousandeyes: 6 tools, API v7
@@ -49,7 +56,13 @@
 - [x] useWakeWord: hands-free, wake/stop words pt-BR, isActive ref
 - [x] VoiceModal: Canvas NDX, Web Audio API, ondas em tempo real
 - [x] Header: voiceMode, handsFreeState, botão Admin
-- [x] AdminPage: seletor modelo, TTS, status serviços
+- [x] AdminPage: seletor modelo, TTS dual-provider (ElevenLabs/OpenAI), status serviços
+- [x] useWakeWord: reescrito com fluxo único — activate → listening → waiting → speaking → listening
+- [x] useWakeWord: cumprimento TTS ao ativar, despedida ao encerrar (4 variações aleatórias)
+- [x] useWhisperInput: silêncio detectado via Web Audio API AnalyserNode (1.5s)
+- [x] VoiceModal NDX: Canvas com 6 anéis orbitais reativos ao microfone
+- [x] SpecialistSelector: dropdown + SpecialistToast: notificação de roteamento
+- [x] useVoiceOutput: suporte ElevenLabs + OpenAI + fallback browser, JWT em todas as chamadas
 - [x] PWA: manifest + service worker
 
 ## Testes ✅ (105 passando)

@@ -1,5 +1,31 @@
 # Changelog — NOC AI Chat
 
+## v3.2 — 2026-04-22 (atual)
+
+### Segurança
+- **Row Level Security**: `session.user_id` verificado em toda reconexão — acesso negado se usuário ≠ dono da sessão
+- **CORS restrito em produção**: `CORS_ALLOW_ALL=false` + lista explícita de origens
+- **Security Headers** em todas as respostas: X-Frame-Options, X-Content-Type-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy, CSP (prod), HSTS (prod)
+- **Auth obrigatória em TTS/STT**: `/tts/speak`, `/tts/voices`, `/stt/transcribe` exigem JWT válido
+- **auth/dependencies.py**: `get_current_user` e `require_admin` centralizados como `Depends` reutilizáveis
+- **Debug endpoints** desabilitados em produção (`/debug/config` → 404)
+- **167 testes** (19 novos de segurança)
+
+### Features
+- **ElevenLabs TTS**: suporte nativo pt-BR com fallback automático para OpenAI quando indisponível (proxy)
+- **Cumprimentos e despedidas**: TTS fala ao ativar ("Olá! Como posso ajudar?") e ao encerrar o modo voz
+- **Handoff de contexto entre especialistas**: ao redirecionar, o novo especialista recebe resumo dos últimos 10 turnos e inicia investigação imediatamente
+
+### Correções críticas
+- `specialist_change` ausente do `WSEventType` — especialista nunca assumia a conversa
+- `_build_handoff_context` chamado com parâmetro inexistente — handoff nunca enviado
+- `_cfg()`: env vars de TTS/STT lidas a cada request (não no import) — chaves reconhecidas sem rebuild
+- `useWakeWord` reescrito com fluxo único e determinista — eliminado travamento após segunda pergunta
+- `useWhisperInput`: silêncio detectado via Web Audio API (1.5s) — Whisper auto-para quando usuário cala
+- Modal NDX desaparecia durante cumprimento — `doSet('speaking')` chamado imediatamente ao ativar
+
+---
+
 ## v3.1 — 2026-04-21 (atual)
 
 ### Novas features
