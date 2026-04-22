@@ -92,17 +92,33 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   useEffect(() => {
     fetch(`${API_URL}/tts/voices`)
       .then(r => r.json())
-      .then((data: TTSStatus) => {
+      .then((rawData: any) => {
+        // Ensure root-level available is computed from providers
+        const data: TTSStatus = {
+          ...rawData,
+          available: rawData.available ?? (rawData.openai?.available || rawData.elevenlabs?.available) ?? false,
+          default_provider: rawData.default_provider || (rawData.elevenlabs?.available ? 'elevenlabs' : 'openai'),
+        }
         setTtsStatus(data)
-        // Set defaults from the appropriate provider
-        const defaultProv = data.default_provider || 'openai'
+        const defaultProv = data.default_provider
         setSelectedProvider(defaultProv)
-        if (defaultProv === 'elevenlabs' && data.elevenlabs?.default_voice_id) {
-          setSelectedVoice(data.elevenlabs.default_voice_id)
-          setSelectedModel(data.elevenlabs.default_model)
-        } else if (data.openai) {
-          setSelectedVoice(data.openai.default_voice || 'onyx')
+        sessionStorage.setItem('tts_provider', defaultProv)
+
+        if (defaultProv === 'elevenlabs' && data.elevenlabs?.available) {
+          // Use first available ElevenLabs voice if no default set
+          const voiceId = data.elevenlabs.default_voice_id
+            || Object.keys(data.elevenlabs.voices ?? {})[0]
+            || ''
+          setSelectedVoice(voiceId)
+          setSelectedModel(data.elevenlabs.default_model || 'eleven_flash_v2_5')
+          sessionStorage.setItem('tts_voice', voiceId)
+          sessionStorage.setItem('tts_model', data.elevenlabs.default_model || 'eleven_flash_v2_5')
+        } else if (data.openai?.available) {
+          const voice = data.openai.default_voice || 'onyx'
+          setSelectedVoice(voice)
           setSelectedModel(data.openai.default_model || 'tts-1-hd')
+          sessionStorage.setItem('tts_voice', voice)
+          sessionStorage.setItem('tts_model', data.openai.default_model || 'tts-1-hd')
         }
       })
       .catch(() => {/* silently fallback to browser TTS */})

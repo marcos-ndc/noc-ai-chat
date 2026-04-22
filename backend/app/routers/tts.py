@@ -45,15 +45,22 @@ SSL_VERIFY     = os.getenv("ANTHROPIC_SSL_VERIFY", "true").lower() != "false"
 # ── Vozes pt-BR recomendadas (IDs buscados via API na sua conta) ──────────────
 # Esses são IDs da Voice Library pública do ElevenLabs para pt-BR
 # O endpoint /tts/voices busca os disponíveis na sua conta
-# Vozes built-in do ElevenLabs disponíveis em TODOS os planos (premade voices)
-# Funcionam bem com pt-BR usando eleven_multilingual_v2 ou eleven_flash_v2_5
+# Vozes disponíveis na conta — inclui premade + vozes configuradas pelo usuário
 ELEVENLABS_PTBR_PRESETS = {
-    "Liam":   {"id": "TX3LPaxmHKxFdv7VOQHJ", "gender": "masculino", "desc": "Jovem masculino — direto e natural"},
-    "Laura":  {"id": "FGY2WhTYpPnrIDTdsKH5", "gender": "feminino",  "desc": "Jovem feminina — conversacional e clara"},
-    "Charlie":{"id": "IKne3meq5aSn9XLyUdCD", "gender": "masculino", "desc": "Masculina casual — natural em pt-BR"},
-    "Alice":  {"id": "Xb7hH8MSUJpSbSDYk0k2", "gender": "feminino",  "desc": "Feminina expressiva — boa pronúncia"},
-    "George": {"id": "JBFqnCBsd6RMkjVDRZzb", "gender": "masculino", "desc": "Voz grave e autoritativa — estilo NOC"},
-    "Matilda":{"id": "XrExE9yKIg1WjnnlVkGX", "gender": "feminino",  "desc": "Feminina amigável e fluente"},
+    # Vozes da conta do usuário
+    "Voz 1":  {"id": "czvzJwIVS2asEKnthV40", "gender": "?", "desc": "Voz personalizada 1"},
+    "Voz 2":  {"id": "jkiD8IhCU1i2V7VvmNwi", "gender": "?", "desc": "Voz personalizada 2"},
+    "Voz 3":  {"id": "Qrdut83w0Cr152Yb4Xn3", "gender": "?", "desc": "Voz personalizada 3"},
+    "Voz 4":  {"id": "liAlPCvGDJ0qsfPupueo", "gender": "?", "desc": "Voz personalizada 4"},
+    "Voz 5":  {"id": "MZxV5lN3cv7hi1376O0m", "gender": "?", "desc": "Voz personalizada 5"},
+    "Voz 6":  {"id": "CbNfj17erd366KLOAufd", "gender": "?", "desc": "Voz personalizada 6"},
+    # Vozes premade disponíveis em todos os planos
+    "Liam":   {"id": "TX3LPaxmHKxFdv7VOQHJ", "gender": "masculino", "desc": "Jovem masculino — direto"},
+    "Laura":  {"id": "FGY2WhTYpPnrIDTdsKH5", "gender": "feminino",  "desc": "Jovem feminina — conversacional"},
+    "Charlie":{"id": "IKne3meq5aSn9XLyUdCD", "gender": "masculino", "desc": "Masculina natural em pt-BR"},
+    "Alice":  {"id": "Xb7hH8MSUJpSbSDYk0k2", "gender": "feminino",  "desc": "Feminina expressiva"},
+    "George": {"id": "JBFqnCBsd6RMkjVDRZzb", "gender": "masculino", "desc": "Grave e autoritativa — NOC"},
+    "Matilda":{"id": "XrExE9yKIg1WjnnlVkGX", "gender": "feminino",  "desc": "Feminina amigável"},
 }
 
 OPENAI_VOICES = {
@@ -185,10 +192,14 @@ async def list_voices():
                                 "gender": labels.get("gender", ""),
                                 "accent": labels.get("accent", ""),
                             }
-                    # Always include presets even if not in account
+                    # Always include ALL presets (custom voices from account + premade)
                     for name, info in ELEVENLABS_PTBR_PRESETS.items():
-                        if info["id"] not in voices:
-                            voices[info["id"]] = {
+                        vid = info["id"]
+                        if vid in voices:
+                            # Enrich preset with real name from API if available
+                            voices[vid]["preset_name"] = name
+                        else:
+                            voices[vid] = {
                                 "name":   name,
                                 "desc":   info["desc"],
                                 "gender": info["gender"],
