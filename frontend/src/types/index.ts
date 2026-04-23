@@ -179,6 +179,15 @@ export interface AdminStatus {
   mcp_servers: Record<string, { status: string }>
 }
 
+export interface PromptEntry {
+  key:          string
+  label:        string
+  category:     'specialist' | 'profile'
+  default_text: string
+  current_text: string
+  is_overridden: boolean
+}
+
 export interface TestResult {
   success:        boolean
   provider?:      AIProvider

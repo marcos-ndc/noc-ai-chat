@@ -8,7 +8,7 @@ from anthropic import AsyncAnthropic
 
 log = structlog.get_logger()
 
-from app.agent.prompt import get_system_prompt
+from app.agent.prompt import get_system_prompt_async
 from app.agent.ai_config import ai_config_store
 from app.agent.llm_client import (
     build_anthropic_client, build_openrouter_client,
@@ -246,7 +246,7 @@ class AgentOrchestrator:
         session.messages.append(ChatMessage(role=MessageRole.user, content=user_message))
         await session_manager.save_session(session)
 
-        system_prompt = get_system_prompt(session.user_profile, specialist=session.active_specialist, voice_mode=voice_mode)
+        system_prompt = await get_system_prompt_async(session.user_profile, specialist=session.active_specialist, voice_mode=voice_mode)
         message_id = str(uuid.uuid4())[:8]
 
         claude_messages = session_manager.build_claude_messages(session)
@@ -266,9 +266,14 @@ class AgentOrchestrator:
             llm = build_anthropic_client(api_key)
             stream_fn = stream_anthropic
 
+        import re as _re
+        _ROUTE_TAG = "<ROUTE_TO"
+        _ROUTE_TAG_MAX = 512  # max chars for a complete <ROUTE_TO .../> tag
+
         while True:
             streamed_text = ""
             tool_calls: list[dict] = []
+            _pending = ""  # buffer to suppress <ROUTE_TO> from reaching frontend
 
             async for event_type, event_data in stream_fn(
                 llm, cfg.model, cfg.max_tokens, 1.0,
@@ -278,13 +283,42 @@ class AgentOrchestrator:
                     text = event_data
                     streamed_text += text
                     full_response += text
-                    yield WSOutbound(
-                        type=WSEventType.agent_token,
-                        messageId=message_id,
-                        content=text,
-                    )
+                    _pending += text
+
+                    # Flush safe portion (strip complete ROUTE_TO tags, buffer partial)
+                    while _pending:
+                        tag_start = _pending.find(_ROUTE_TAG)
+                        if tag_start == -1:
+                            # No ROUTE_TO — flush all except last few chars (partial tag guard)
+                            safe = max(0, len(_pending) - len(_ROUTE_TAG))
+                            if safe:
+                                yield WSOutbound(type=WSEventType.agent_token, messageId=message_id, content=_pending[:safe])
+                                _pending = _pending[safe:]
+                            break
+                        else:
+                            # Flush text before the tag
+                            if tag_start > 0:
+                                yield WSOutbound(type=WSEventType.agent_token, messageId=message_id, content=_pending[:tag_start])
+                                _pending = _pending[tag_start:]
+                            # Wait for closing />
+                            tag_end = _pending.find("/>")
+                            if tag_end == -1:
+                                if len(_pending) > _ROUTE_TAG_MAX:
+                                    # Malformed / not a real tag — flush it
+                                    yield WSOutbound(type=WSEventType.agent_token, messageId=message_id, content=_pending)
+                                    _pending = ""
+                                break  # keep buffering
+                            else:
+                                _pending = _pending[tag_end + 2:]  # skip the tag
+
                 elif event_type == "final":
                     final_msg = event_data
+
+            # Flush any remaining buffered text (stripped of ROUTE_TO)
+            if _pending:
+                clean_pending = _re.sub(r'<ROUTE_TO[^>]*/>', '', _pending, flags=_re.IGNORECASE).strip()
+                if clean_pending:
+                    yield WSOutbound(type=WSEventType.agent_token, messageId=message_id, content=clean_pending)
 
             tool_calls = [
                 {"id": b.id, "name": b.name, "input": b.input}
@@ -339,10 +373,24 @@ class AgentOrchestrator:
             # loop → next stream call includes tool results
 
         # ── Persist + detect ROUTE_TO ─────────────────────────────────────────
+        # Normalize common LLM aliases to canonical specialist names
+        _SPEC_ALIASES: dict[str, str] = {
+            "infrastructure": "infra",
+            "infraestrutura": "infra",
+            "infra-estrutura": "infra",
+            "connectivity": "conectividade",
+            "network": "conectividade",
+            "networking": "conectividade",
+            "redes": "conectividade",
+            "application": "apm",
+            "aplicacao": "apm",
+            "observability": "observabilidade",
+            "general": "generalista",
+        }
+
         if full_response:
-            import re as _re
             route_match = _re.search(
-                r'<ROUTE_TO\s+specialist=["\'](\w+)["\'"]\s+reason=["\'"]([^"\'>]*)["\'"]\s*/?>',
+                r'<ROUTE_TO\s+specialist=["\'](\w[\w-]*)["\'"]\s+reason=["\'"]([^"\'>]*)["\'"]\s*/?>',
                 full_response, _re.IGNORECASE
             )
             # Strip the ROUTE_TO tag from stored/displayed message
@@ -355,7 +403,7 @@ class AgentOrchestrator:
             )
 
             if route_match:
-                new_spec     = route_match.group(1).lower()
+                new_spec     = _SPEC_ALIASES.get(route_match.group(1).lower(), route_match.group(1).lower())
                 route_reason = route_match.group(2)
                 from app.models import Specialist as _Spec, SPECIALIST_LABELS
                 valid = [s.value for s in _Spec]

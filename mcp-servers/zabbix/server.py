@@ -344,7 +344,7 @@ async def get_active_problems(body: GetActiveProblemsInput):
         "output": "extend",
         "selectAcknowledges": ["userid", "message", "clock"],
         "selectTags": "extend",
-        "sortfield": ["severity", "clock"],
+        "sortfield": ["eventid"],
         "sortorder": "DESC",
         "limit": body.limit,
         "severities": list(range(min_sev, 6)),

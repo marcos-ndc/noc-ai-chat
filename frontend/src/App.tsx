@@ -2,15 +2,19 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { LoginPage } from './pages/LoginPage'
 import { ChatPage } from './pages/ChatPage'
 import { AdminPage } from './pages/AdminPage'
-import { useAuthStore } from './hooks/useAuth'
+import { useAuthStore, useHydrated } from './hooks/useAuth'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const hydrated = useHydrated()
+  if (!hydrated) return null  // aguarda localStorage antes de redirecionar
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const hydrated = useHydrated()
+  if (!hydrated) return null  // aguarda localStorage antes de redirecionar
   return isAuthenticated ? <Navigate to="/chat" replace /> : <>{children}</>
 }
 

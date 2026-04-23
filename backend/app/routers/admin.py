@@ -1,11 +1,12 @@
 """
 Router: Admin Panel
 Endpoints de administração — requer perfil admin.
-Gerencia configuração de IA em runtime (provedor, modelo, API key).
+Gerencia configuração de IA e system prompts em runtime.
 """
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
 
 from app.agent.ai_config import ai_config_store
 from app.auth.service import auth_service
@@ -221,6 +222,79 @@ async def test_ai_config(
             "provider":   cfg.provider,
             "model":      cfg.model,
         }
+
+
+# ─── Prompt management ────────────────────────────────────────────────────────
+
+_PROMPT_META: dict[str, dict] = {
+    "specialist:generalista":     {"label": "Generalista NOC",          "category": "specialist"},
+    "specialist:apm":             {"label": "Especialista APM & Logs",  "category": "specialist"},
+    "specialist:infra":           {"label": "Especialista Infraestrutura", "category": "specialist"},
+    "specialist:conectividade":   {"label": "Especialista Conectividade",  "category": "specialist"},
+    "specialist:observabilidade": {"label": "Especialista Observabilidade","category": "specialist"},
+    "profile:N1":       {"label": "Perfil N1 (Analista N1)",    "category": "profile"},
+    "profile:N2":       {"label": "Perfil N2 (Analista N2)",    "category": "profile"},
+    "profile:engineer": {"label": "Perfil Engineer (Engenheiro)","category": "profile"},
+    "profile:manager":  {"label": "Perfil Manager (Gestor)",    "category": "profile"},
+    "profile:admin":    {"label": "Perfil Admin",               "category": "profile"},
+}
+
+
+class PromptUpdate(BaseModel):
+    text: str
+
+
+@router.get("/prompts")
+async def get_prompts(_: UserOut = Depends(require_admin)) -> list[dict]:
+    """Lista todos os prompts com valores atuais (override ou padrão)."""
+    from app.agent.prompt import get_default_prompts
+    from app.agent.prompt_store import prompt_store
+
+    defaults = get_default_prompts()
+    result = []
+    for key, meta in _PROMPT_META.items():
+        default_text = defaults.get(key, "")
+        override = await prompt_store.get_override(key)
+        result.append({
+            "key":          key,
+            "label":        meta["label"],
+            "category":     meta["category"],
+            "default_text": default_text,
+            "current_text": override if override is not None else default_text,
+            "is_overridden": override is not None,
+        })
+    return result
+
+
+@router.put("/prompts/{key:path}")
+async def update_prompt(
+    key: str,
+    body: PromptUpdate,
+    user: UserOut = Depends(require_admin),
+) -> dict:
+    """Salva um override para o prompt especificado."""
+    if key not in _PROMPT_META:
+        raise HTTPException(status_code=404, detail=f"Prompt '{key}' não encontrado")
+
+    from app.agent.prompt_store import prompt_store
+    await prompt_store.set_override(key, body.text)
+    log.info("admin.prompt_updated", key=key, user=user.email)
+    return {"ok": True, "key": key, "is_overridden": True}
+
+
+@router.delete("/prompts/{key:path}")
+async def reset_prompt(
+    key: str,
+    user: UserOut = Depends(require_admin),
+) -> dict:
+    """Remove o override, voltando ao prompt padrão."""
+    if key not in _PROMPT_META:
+        raise HTTPException(status_code=404, detail=f"Prompt '{key}' não encontrado")
+
+    from app.agent.prompt_store import prompt_store
+    await prompt_store.clear_override(key)
+    log.info("admin.prompt_reset", key=key, user=user.email)
+    return {"ok": True, "key": key, "is_overridden": False}
 
 
 @router.get("/status")

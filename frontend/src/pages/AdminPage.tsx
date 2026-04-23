@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../hooks/useAuth'
-import type { AIConfigInput, AIConfigOut, AdminStatus, ModelOption, TestResult } from '../types'
+import type { AIConfigInput, AIConfigOut, AdminStatus, ModelOption, PromptEntry, TestResult } from '../types'
 
 const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
@@ -144,6 +144,332 @@ function StatusDot({ status }: { status: string }) {
   )
 }
 
+// ─── Prompts Tab ──────────────────────────────────────────────────────────────
+
+const CATEGORY_LABELS: Record<string, string> = {
+  specialist: 'Especialistas',
+  profile:    'Perfis de Usuário',
+}
+
+const CATEGORY_ICONS: Record<string, string> = {
+  specialist: '🤖',
+  profile:    '👤',
+}
+
+function PromptCard({
+  entry,
+  onSave,
+  onReset,
+}: {
+  entry:   PromptEntry
+  onSave:  (key: string, text: string) => Promise<void>
+  onReset: (key: string) => Promise<void>
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const [editing,  setEditing]  = useState(false)
+  const [draft,    setDraft]    = useState(entry.current_text)
+  const [saving,   setSaving]   = useState(false)
+  const [msg,      setMsg]      = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Sync draft when entry changes externally
+  useEffect(() => { setDraft(entry.current_text) }, [entry.current_text])
+
+  const handleEdit = () => {
+    setEditing(true)
+    setExpanded(true)
+    setTimeout(() => textareaRef.current?.focus(), 50)
+  }
+
+  const handleCancel = () => {
+    setDraft(entry.current_text)
+    setEditing(false)
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(entry.key, draft)
+      setMsg('✅ Salvo')
+      setEditing(false)
+    } catch {
+      setMsg('❌ Erro ao salvar')
+    } finally {
+      setSaving(false)
+      setTimeout(() => setMsg(''), 3000)
+    }
+  }
+
+  const handleReset = async () => {
+    setSaving(true)
+    try {
+      await onReset(entry.key)
+      setDraft(entry.default_text)
+      setMsg('↩️ Restaurado ao padrão')
+      setEditing(false)
+    } catch {
+      setMsg('❌ Erro ao restaurar')
+    } finally {
+      setSaving(false)
+      setTimeout(() => setMsg(''), 3000)
+    }
+  }
+
+  const isDirty = draft !== entry.current_text
+
+  return (
+    <div className={`rounded-xl border transition-all duration-150 overflow-hidden ${
+      entry.is_overridden
+        ? 'border-noc-accent/40 bg-noc-accent/3'
+        : 'border-noc-border/60 bg-noc-bg/20'
+    }`}>
+      {/* Header row */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="flex-1 flex items-center gap-3 text-left min-w-0"
+        >
+          <svg
+            viewBox="0 0 24 24" fill="currentColor"
+            className={`w-3.5 h-3.5 text-noc-muted flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
+          >
+            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/>
+          </svg>
+          <span className="text-xs font-semibold font-mono text-noc-text truncate">{entry.label}</span>
+          {entry.is_overridden && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-noc-accent/20 border border-noc-accent/40 text-noc-accent font-mono font-bold flex-shrink-0">
+              EDITADO
+            </span>
+          )}
+        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {msg && (
+            <span className={`text-[10px] font-mono ${msg.startsWith('✅') || msg.startsWith('↩️') ? 'text-noc-success' : 'text-noc-danger'}`}>
+              {msg}
+            </span>
+          )}
+          {!editing && (
+            <button
+              type="button"
+              onClick={handleEdit}
+              className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-noc-border text-noc-muted hover:text-noc-accent hover:border-noc-accent/40 transition-all"
+            >
+              ✏️ Editar
+            </button>
+          )}
+          {entry.is_overridden && !editing && (
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={saving}
+              className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-noc-border text-noc-muted hover:text-noc-warning hover:border-noc-warning/40 transition-all disabled:opacity-40"
+            >
+              ↩️ Padrão
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Expandable content */}
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-noc-border/40">
+          <div className="mt-3">
+            {editing ? (
+              <>
+                <textarea
+                  ref={textareaRef}
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  rows={16}
+                  className="w-full px-3 py-2.5 bg-noc-bg border border-noc-border rounded-lg text-[11px] font-mono text-noc-text leading-relaxed resize-y focus:outline-none focus:border-noc-accent/60 focus:ring-1 focus:ring-noc-accent/20"
+                />
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving || !isDirty}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-noc-accent text-noc-bg text-[11px] font-bold font-mono hover:bg-noc-accent/90 transition-all disabled:opacity-40 shadow-md shadow-noc-accent/20"
+                  >
+                    {saving ? <div className="w-3 h-3 border-2 border-noc-bg/30 border-t-noc-bg rounded-full animate-spin" /> : '💾'}
+                    Salvar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    disabled={saving}
+                    className="px-4 py-2 rounded-lg border border-noc-border text-noc-muted text-[11px] font-mono hover:text-noc-text transition-all disabled:opacity-40"
+                  >
+                    Cancelar
+                  </button>
+                  {entry.is_overridden && (
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      disabled={saving}
+                      className="px-4 py-2 rounded-lg border border-noc-border text-noc-muted text-[11px] font-mono hover:text-noc-warning hover:border-noc-warning/40 transition-all disabled:opacity-40 ml-auto"
+                    >
+                      ↩️ Restaurar padrão
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <pre className="text-[10px] font-mono text-noc-muted leading-relaxed whitespace-pre-wrap break-words bg-noc-bg/50 rounded-lg px-3 py-2.5 border border-noc-border/40 max-h-80 overflow-y-auto">
+                {entry.current_text}
+              </pre>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PromptsTab({ api }: { api: ReturnType<typeof useAdminAPI> }) {
+  const [prompts,  setPrompts]  = useState<PromptEntry[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [error,    setError]    = useState('')
+  const [activeCategory, setActiveCategory] = useState<'specialist' | 'profile'>('specialist')
+
+  useEffect(() => {
+    api.get('/admin/prompts')
+      .then((data: unknown) => {
+        if (Array.isArray(data)) {
+          setPrompts(data as PromptEntry[])
+        } else {
+          setError(`Resposta inesperada da API: ${JSON.stringify(data).slice(0, 120)}`)
+        }
+      })
+      .catch((e: unknown) => setError(String(e)))
+      .finally(() => setLoading(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSave = async (key: string, text: string) => {
+    const token = useAuthStore.getState().token
+    const res = await fetch(
+      `${import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'}/admin/prompts/${encodeURIComponent(key)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ text }),
+      }
+    )
+    if (!res.ok) throw new Error('save failed')
+    setPrompts(prev => prev.map(p =>
+      p.key === key ? { ...p, current_text: text, is_overridden: true } : p
+    ))
+  }
+
+  const handleReset = async (key: string) => {
+    const token = useAuthStore.getState().token
+    const res = await fetch(
+      `${import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'}/admin/prompts/${encodeURIComponent(key)}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    )
+    if (!res.ok) throw new Error('reset failed')
+    setPrompts(prev => prev.map(p =>
+      p.key === key ? { ...p, current_text: p.default_text, is_overridden: false } : p
+    ))
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-6 h-6 border-2 border-noc-accent/30 border-t-noc-accent rounded-full animate-spin" />
+          <span className="text-[11px] font-mono text-noc-muted">carregando prompts...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-5 rounded-xl border border-noc-danger/30 bg-noc-danger/5 text-xs font-mono text-noc-danger space-y-2">
+        <p className="font-bold">❌ Erro ao carregar prompts</p>
+        <p className="text-noc-muted break-all">{error}</p>
+        <button
+          type="button"
+          onClick={() => { setError(''); setLoading(true); api.get('/admin/prompts').then((d: unknown) => Array.isArray(d) ? setPrompts(d as PromptEntry[]) : setError(JSON.stringify(d))).catch((e: unknown) => setError(String(e))).finally(() => setLoading(false)) }}
+          className="mt-2 px-3 py-1.5 rounded-lg border border-noc-danger/40 text-noc-danger hover:bg-noc-danger/10 transition-colors"
+        >
+          ↺ Tentar novamente
+        </button>
+      </div>
+    )
+  }
+
+  const overriddenCount = prompts.filter(p => p.is_overridden).length
+  const filtered = prompts.filter(p => p.category === activeCategory)
+
+  return (
+    <div className="space-y-6">
+      {/* Info banner */}
+      <div className="p-4 rounded-xl bg-noc-accent/5 border border-noc-accent/20 text-[11px] font-mono text-noc-muted leading-relaxed">
+        <p className="text-noc-text font-semibold mb-1">📝 System Prompts dos Agentes</p>
+        <p>
+          Cada agente especialista e perfil de usuário possui um system prompt que define seu comportamento.
+          Edições são salvas no Redis e entram em vigor imediatamente — sem reiniciar o backend.
+          {overriddenCount > 0 && (
+            <span className="text-noc-accent ml-1">{overriddenCount} prompt{overriddenCount > 1 ? 's' : ''} customizado{overriddenCount > 1 ? 's' : ''}.</span>
+          )}
+        </p>
+      </div>
+
+      {/* Category tabs */}
+      <div className="flex gap-3">
+        {(['specialist', 'profile'] as const).map(cat => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => setActiveCategory(cat)}
+            className={`
+              flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-mono font-semibold transition-all
+              ${activeCategory === cat
+                ? 'bg-noc-accent/10 border-noc-accent text-noc-accent shadow-md shadow-noc-accent/10'
+                : 'border-noc-border text-noc-muted hover:border-noc-border/80 hover:text-noc-text'
+              }
+            `}
+          >
+            <span>{CATEGORY_ICONS[cat]}</span>
+            <span>{CATEGORY_LABELS[cat]}</span>
+            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+              activeCategory === cat ? 'bg-noc-accent/20 text-noc-accent' : 'bg-noc-border text-noc-muted'
+            }`}>
+              {prompts.filter(p => p.category === cat && p.is_overridden).length > 0
+                ? `${prompts.filter(p => p.category === cat && p.is_overridden).length}/${prompts.filter(p => p.category === cat).length}`
+                : prompts.filter(p => p.category === cat).length
+              }
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Prompt cards */}
+      <div className="space-y-2">
+        {filtered.length === 0 ? (
+          <div className="py-10 text-center text-xs font-mono text-noc-muted">
+            Nenhum prompt encontrado para esta categoria.
+          </div>
+        ) : (
+          filtered.map(entry => (
+            <PromptCard
+              key={entry.key}
+              entry={entry}
+              onSave={handleSave}
+              onReset={handleReset}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main AdminPage ───────────────────────────────────────────────────────────
 
 export function AdminPage() {
@@ -151,6 +477,7 @@ export function AdminPage() {
   const user      = useAuthStore(s => s.user)
   const api       = useAdminAPI()
 
+  const [activeTab, setActiveTab] = useState<'config' | 'prompts'>('config')
   const [config,    setConfig]    = useState<AIConfigOut | null>(null)
   const [models,    setModels]    = useState<ModelOption[]>([])
   const [status,    setStatus]    = useState<AdminStatus | null>(null)
@@ -266,31 +593,62 @@ export function AdminPage() {
     <div className="min-h-screen noc-grid text-noc-text">
 
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-noc-border bg-noc-surface/90 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => navigate('/chat')}
-            className="flex items-center gap-2 text-noc-muted hover:text-noc-text transition-colors text-sm font-mono"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-            </svg>
-            Chat
-          </button>
-          <span className="text-noc-border">|</span>
-          <div className="flex items-center gap-2">
-            <span className="text-noc-accent text-lg">⚙️</span>
-            <h1 className="text-sm font-bold font-mono text-noc-text tracking-wider">PAINEL DE ADMINISTRAÇÃO</h1>
+      <header className="sticky top-0 z-10 border-b border-noc-border bg-noc-surface/90 backdrop-blur-sm">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => navigate('/chat')}
+              className="flex items-center gap-2 text-noc-muted hover:text-noc-text transition-colors text-sm font-mono"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+              </svg>
+              Chat
+            </button>
+            <span className="text-noc-border">|</span>
+            <div className="flex items-center gap-2">
+              <span className="text-noc-accent text-lg">⚙️</span>
+              <h1 className="text-sm font-bold font-mono text-noc-text tracking-wider">PAINEL DE ADMINISTRAÇÃO</h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-mono text-noc-muted">{user?.email}</span>
+            <span className="text-[9px] px-2 py-0.5 rounded-full bg-noc-accent/10 border border-noc-accent/30 text-noc-accent font-mono font-bold">ADMIN</span>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] font-mono text-noc-muted">{user?.email}</span>
-          <span className="text-[9px] px-2 py-0.5 rounded-full bg-noc-accent/10 border border-noc-accent/30 text-noc-accent font-mono font-bold">ADMIN</span>
+        {/* Tab navigation */}
+        <div className="flex gap-1 px-6 pb-0">
+          {([
+            { id: 'config',  icon: '🔧', label: 'Configuração' },
+            { id: 'prompts', icon: '📝', label: 'System Prompts' },
+          ] as const).map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                flex items-center gap-1.5 px-4 py-2.5 text-xs font-mono font-semibold border-b-2 transition-all
+                ${activeTab === tab.id
+                  ? 'border-noc-accent text-noc-accent'
+                  : 'border-transparent text-noc-muted hover:text-noc-text hover:border-noc-border'
+                }
+              `}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
         </div>
       </header>
 
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+
+        {/* Prompts tab */}
+        {activeTab === 'prompts' && <PromptsTab api={api} />}
+
+        {/* Config tab */}
+        {activeTab === 'config' && <>
 
         {/* Status row */}
         {status && (
@@ -699,6 +1057,7 @@ export function AdminPage() {
 
         {/* Spacer */}
         <div className="h-8" />
+        </>}
       </div>
     </div>
   )

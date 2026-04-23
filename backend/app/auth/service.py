@@ -32,7 +32,7 @@ _USERS: list[dict] = [
         "name": "Admin NOC",
         "email": "admin@noc.local",
         "hashed_password": _hash_password("admin123"),
-        "profile": UserProfile.N2,
+        "profile": UserProfile.admin,
     },
     {
         "id": "user-2",

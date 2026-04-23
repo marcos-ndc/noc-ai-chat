@@ -49,20 +49,26 @@ SSL_VERIFY     = os.getenv("ANTHROPIC_SSL_VERIFY", "true").lower() != "false"
 # O endpoint /tts/voices busca os disponíveis na sua conta
 # Vozes disponíveis na conta — inclui premade + vozes configuradas pelo usuário
 ELEVENLABS_PTBR_PRESETS = {
-    # Vozes da conta do usuário
-    "Voz 1":  {"id": "czvzJwIVS2asEKnthV40", "gender": "?", "desc": "Voz personalizada 1"},
-    "Voz 2":  {"id": "jkiD8IhCU1i2V7VvmNwi", "gender": "?", "desc": "Voz personalizada 2"},
-    "Voz 3":  {"id": "Qrdut83w0Cr152Yb4Xn3", "gender": "?", "desc": "Voz personalizada 3"},
-    "Voz 4":  {"id": "liAlPCvGDJ0qsfPupueo", "gender": "?", "desc": "Voz personalizada 4"},
-    "Voz 5":  {"id": "MZxV5lN3cv7hi1376O0m", "gender": "?", "desc": "Voz personalizada 5"},
-    "Voz 6":  {"id": "CbNfj17erd366KLOAufd", "gender": "?", "desc": "Voz personalizada 6"},
-    # Vozes premade disponíveis em todos os planos
-    "Liam":   {"id": "TX3LPaxmHKxFdv7VOQHJ", "gender": "masculino", "desc": "Jovem masculino — direto"},
-    "Laura":  {"id": "FGY2WhTYpPnrIDTdsKH5", "gender": "feminino",  "desc": "Jovem feminina — conversacional"},
-    "Charlie":{"id": "IKne3meq5aSn9XLyUdCD", "gender": "masculino", "desc": "Masculina natural em pt-BR"},
-    "Alice":  {"id": "Xb7hH8MSUJpSbSDYk0k2", "gender": "feminino",  "desc": "Feminina expressiva"},
-    "George": {"id": "JBFqnCBsd6RMkjVDRZzb", "gender": "masculino", "desc": "Grave e autoritativa — NOC"},
-    "Matilda":{"id": "XrExE9yKIg1WjnnlVkGX", "gender": "feminino",  "desc": "Feminina amigável"},
+    # ── Vozes premade — funcionam em todos os planos (inclusive gratuito) ────
+    "Brian ⭐":   {"id": "nPczCjzI2devNBz1zQrb", "gender": "masculino", "desc": "Profundo, ressonante — recomendado NOC"},
+    "Adam":       {"id": "pNInz6obpgDQGcFmaJgB", "gender": "masculino", "desc": "Dominante e firme"},
+    "George":     {"id": "JBFqnCBsd6RMkjVDRZzb", "gender": "masculino", "desc": "Caloroso e cativante"},
+    "Daniel":     {"id": "onwK4e9ZLuTAKqWW03F9", "gender": "masculino", "desc": "Locutor estável e profissional"},
+    "Bill":       {"id": "pqHfZKP75CvOlQylNhV4", "gender": "masculino", "desc": "Sábio e equilibrado"},
+    "Roger":      {"id": "CwhRBWXzGAHq8TQ4Fs17", "gender": "masculino", "desc": "Descontraído e ressonante"},
+    "Charlie":    {"id": "IKne3meq5aSn9XLyUdCD", "gender": "masculino", "desc": "Profundo, confiante e energético"},
+    "Liam":       {"id": "TX3LPaxmHKxFdv7VOQHJ", "gender": "masculino", "desc": "Energético"},
+    "Sarah":      {"id": "EXAVITQu4vr4xnSDxMaL", "gender": "feminino",  "desc": "Madura, segura e reconfortante"},
+    "Alice":      {"id": "Xb7hH8MSUJpSbSDYk0k2", "gender": "feminino",  "desc": "Clara e envolvente"},
+    "Laura":      {"id": "FGY2WhTYpPnrIDTdsKH5", "gender": "feminino",  "desc": "Entusiasmada e conversacional"},
+    "Matilda":    {"id": "XrExE9yKIg1WjnnlVkGX", "gender": "feminino",  "desc": "Profissional e conhecedora"},
+    # ── Library Voices — requerem plano pago ─────────────────────────────────
+    "Daniel BR 💳": {"id": "czvzJwIVS2asEKnthV40", "gender": "masculino", "desc": "Brasileiro conversacional [plano pago]"},
+    "Voz 2 💳":     {"id": "jkiD8IhCU1i2V7VvmNwi", "gender": "?",         "desc": "Voz personalizada [plano pago]"},
+    "Voz 3 💳":     {"id": "Qrdut83w0Cr152Yb4Xn3", "gender": "?",         "desc": "Voz personalizada [plano pago]"},
+    "Voz 4 💳":     {"id": "liAlPCvGDJ0qsfPupueo", "gender": "?",         "desc": "Voz personalizada [plano pago]"},
+    "Voz 5 💳":     {"id": "MZxV5lN3cv7hi1376O0m", "gender": "?",         "desc": "Voz personalizada [plano pago]"},
+    "Voz 6 💳":     {"id": "CbNfj17erd366KLOAufd", "gender": "?",         "desc": "Voz personalizada [plano pago]"},
 }
 
 OPENAI_VOICES = {

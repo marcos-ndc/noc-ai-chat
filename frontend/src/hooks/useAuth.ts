@@ -1,8 +1,9 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { AuthState, AuthCredentials, User } from '../types'
 
-// ─── Auth Store (Zustand) ─────────────────────────────────────────────────────
+// ─── Auth Store (Zustand + localStorage persistence) ─────────────────────────
 
 interface AuthStore extends AuthState {
   isLoading: boolean
@@ -13,17 +14,48 @@ interface AuthStore extends AuthState {
   setError: (v: string | null) => void
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
-  user: null,
-  token: null,
-  isAuthenticated: false,
-  isLoading: false,
-  error: null,
-  login: (token, user) => set({ token, user, isAuthenticated: true, error: null }),
-  logout: () => set({ token: null, user: null, isAuthenticated: false }),
-  setLoading: (v) => set({ isLoading: v }),
-  setError: (v) => set({ error: v }),
-}))
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set) => ({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+      login: (token, user) => set({ token, user, isAuthenticated: true, error: null }),
+      logout: () => set({ token: null, user: null, isAuthenticated: false }),
+      setLoading: (v) => set({ isLoading: v }),
+      setError: (v) => set({ error: v }),
+    }),
+    {
+      name: 'noc-ai-auth',
+      version: 2,
+      migrate: () => ({ token: null, user: null, isAuthenticated: false }),
+      partialize: (state) => ({
+        token:           state.token,
+        user:            state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
+    }
+  )
+)
+
+/** Hook que retorna true assim que o store terminou de hidratar do localStorage */
+export function useHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(
+    () => useAuthStore.persist.hasHydrated()
+  )
+
+  useEffect(() => {
+    if (hydrated) return
+    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true))
+    // Caso já tenha hidratado antes de assinar o listener
+    if (useAuthStore.persist.hasHydrated()) setHydrated(true)
+    return unsub
+  }, [hydrated])
+
+  return hydrated
+}
 
 // ─── useAuth Hook ─────────────────────────────────────────────────────────────
 
