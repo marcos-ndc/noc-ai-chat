@@ -130,6 +130,9 @@ class AIConfig(BaseModel):
     openrouter_base_url: str        = "https://openrouter.ai/api/v1"
     site_url:            str        = ""
     site_name:           str        = "NOC AI Chat"
+    # Voice per specialist: {specialist_id: voice_id}
+    # Empty string = use default TTS voice
+    specialist_voices:   dict[str, str] = {}
 
 class AIConfigOut(BaseModel):
     """Public view of AI config - api_key is masked."""

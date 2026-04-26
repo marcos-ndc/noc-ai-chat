@@ -503,6 +503,9 @@ export function AdminPage() {
   const [ttsSpeed,  setTtsSpeed]  = useState(0.92)
   const [ttsSaving, setTtsSaving] = useState(false)
   const [ttsSaveMsg, setTtsSaveMsg] = useState('')
+  const [specVoices, setSpecVoices] = useState<Record<string,string>>({})
+  const [specVoicesSaving, setSpecVoicesSaving] = useState(false)
+  const [specVoicesMsg, setSpecVoicesMsg] = useState('')
 
   // Form state
   const [provider,    setProvider]    = useState<'anthropic' | 'openrouter'>('anthropic')
@@ -529,7 +532,9 @@ export function AdminPage() {
       api.get('/admin/models'),
       api.get('/admin/status'),
       api.get('/tts/voices'),
-    ]).then(([cfg, mdls, st, tts]) => {
+      api.get('/admin/specialist-voices'),
+    ]).then(([cfg, mdls, st, tts, sv]) => {
+      if (sv && typeof sv === 'object' && !sv.detail) setSpecVoices(sv)
       setTtsInfo(tts)
       // Detect active provider and pre-select voice/model
       const provider = tts?.elevenlabs?.available ? 'elevenlabs' : 'openai'
@@ -1063,6 +1068,94 @@ export function AdminPage() {
               )}
             </div>
           )}
+        </SectionCard>
+
+        {/* Vozes por Especialista */}
+        <SectionCard title="VOZES POR ESPECIALISTA" icon="🎭">
+          <div className="space-y-4">
+            <p className="text-[11px] text-noc-muted font-mono">
+              Cada especialista pode ter uma voz diferente. Deixe em branco para usar a voz padrão.
+            </p>
+
+            {[
+              { id: 'generalista',     label: 'Generalista',     icon: '🤖' },
+              { id: 'apm',             label: 'APM & Logs',      icon: '📊' },
+              { id: 'infra',           label: 'Infraestrutura',  icon: '🖥️' },
+              { id: 'conectividade',   label: 'Conectividade',   icon: '🌐' },
+              { id: 'observabilidade', label: 'Observabilidade', icon: '📈' },
+            ].map(spec => (
+              <div key={spec.id} className="flex items-center gap-3">
+                <div className="flex items-center gap-2 w-44 shrink-0">
+                  <span className="text-base">{spec.icon}</span>
+                  <span className="text-xs font-mono text-noc-text">{spec.label}</span>
+                </div>
+                <select
+                  value={specVoices[spec.id] ?? ''}
+                  onChange={e => setSpecVoices(prev => ({ ...prev, [spec.id]: e.target.value }))}
+                  className="flex-1 bg-noc-bg border border-noc-border rounded-lg px-3 py-1.5 text-xs font-mono text-noc-text focus:border-noc-accent focus:outline-none"
+                >
+                  <option value="">— Voz padrão —</option>
+                  {/* OpenAI voices */}
+                  {ttsInfo?.openai?.available && (
+                    <optgroup label="OpenAI TTS">
+                      {Object.entries(ttsInfo.openai.voices ?? {}).map(([id, v]) => (
+                        <option key={`openai:${id}`} value={`openai:${id}`}>
+                          {(v as {label:string}).label ?? id}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {/* ElevenLabs voices */}
+                  {ttsInfo?.elevenlabs?.available && (
+                    <optgroup label="ElevenLabs pt-BR">
+                      {Object.entries(ttsInfo.elevenlabs.voices ?? {}).map(([vid, v]) => (
+                        <option key={`el:${vid}`} value={`el:${vid}`}>
+                          {(v as {name:string}).name ?? vid}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            ))}
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  setSpecVoicesSaving(true)
+                  setSpecVoicesMsg('')
+                  const token = useAuthStore.getState().token
+                  try {
+                    await fetch(`${API}/admin/specialist-voices`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                      body: JSON.stringify({ voices: specVoices }),
+                    })
+                    // Persist to sessionStorage for immediate effect
+                    Object.entries(specVoices).forEach(([k, v]) =>
+                      sessionStorage.setItem(`tts_voice_${k}`, v)
+                    )
+                    setSpecVoicesMsg('✅ Vozes salvas com sucesso!')
+                  } catch {
+                    setSpecVoicesMsg('❌ Erro ao salvar vozes')
+                  } finally {
+                    setSpecVoicesSaving(false)
+                    setTimeout(() => setSpecVoicesMsg(''), 4000)
+                  }
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-noc-accent text-noc-bg text-xs font-bold font-mono hover:bg-noc-accent/90 transition-all"
+              >
+                {specVoicesSaving
+                  ? <div className="w-3.5 h-3.5 border-2 border-noc-bg/30 border-t-noc-bg rounded-full animate-spin" />
+                  : '🎭'}
+                Salvar Vozes
+              </button>
+              {specVoicesMsg && (
+                <span className="text-[10px] font-mono text-noc-success">{specVoicesMsg}</span>
+              )}
+            </div>
+          </div>
         </SectionCard>
 
         {/* Spacer */}

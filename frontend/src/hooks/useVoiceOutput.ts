@@ -51,6 +51,7 @@ interface UseVoiceOutputReturn {
   currentVoice: string
   ttsStatus:    TTSStatus | null
   speak:        (text: string) => void
+  speakWithVoice:(text: string, voiceOverride?: string) => void
   stop:         () => void
   pause:        () => void
   resume:       () => void
@@ -242,6 +243,42 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
     }
   }, [ttsStatus?.available, speakPremium, speakBrowser])
 
+  // speakWithVoice: like speak() but with optional one-shot voice override
+  // voiceOverride format: "openai:nova" | "el:voiceId" | plain voiceId
+  const speakWithVoice = useCallback((text: string, voiceOverride?: string) => {
+    if (!text.trim()) return
+    if (!voiceOverride || !ttsStatus?.available) { speak(text); return }
+
+    const prevVoice    = sessionStorage.getItem('tts_voice')
+    const prevProvider = sessionStorage.getItem('tts_provider')
+
+    // Parse prefix
+    let provider = prevProvider ?? 'openai'
+    let voiceId  = voiceOverride
+    if (voiceOverride.startsWith('openai:')) {
+      provider = 'openai'
+      voiceId  = voiceOverride.slice(7)
+    } else if (voiceOverride.startsWith('el:')) {
+      provider = 'elevenlabs'
+      voiceId  = voiceOverride.slice(3)
+    }
+
+    // Apply override
+    sessionStorage.setItem('tts_provider', provider)
+    sessionStorage.setItem('tts_voice', voiceId)
+    setSelectedVoice(voiceId)
+    setSelectedProvider(provider)
+
+    // Restore after a tick (gives speakPremium time to read sessionStorage)
+    const restore = () => {
+      if (prevProvider) sessionStorage.setItem('tts_provider', prevProvider)
+      if (prevVoice)    sessionStorage.setItem('tts_voice', prevVoice)
+      else              sessionStorage.removeItem('tts_voice')
+    }
+
+    setTimeout(() => { speakPremium(text); setTimeout(restore, 150) }, 50)
+  }, [ttsStatus?.available, speakPremium, speak, setSelectedVoice, setSelectedProvider])
+
   const pause = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause()
@@ -269,6 +306,7 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
     stop,
     pause,
     resume,
+    speakWithVoice,
     setVoice:    setSelectedVoice,
     setModel:    setSelectedModel,
     setSpeed:    setSelectedSpeed,
