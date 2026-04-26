@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     # Auth
     jwt_secret: str = "dev-secret-change-in-production"
-    jwt_expiry_hours: int = 8
+    jwt_expiry_hours: int = 12   # configurable via JWT_EXPIRY_HOURS env var
     jwt_algorithm: str = "HS256"
 
     # Redis

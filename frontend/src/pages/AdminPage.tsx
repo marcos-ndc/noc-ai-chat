@@ -22,11 +22,21 @@ interface TTSStatus {
 }
 
 function useAdminAPI() {
-  const token = useAuthStore(s => s.token)
+  const token  = useAuthStore(s => s.token)
+  const logout = useAuthStore(s => s.logout)
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
-  const get  = (path: string) => fetch(`${API}${path}`, { headers }).then(r => r.json())
-  const put  = (path: string, body: unknown) => fetch(`${API}${path}`, { method: 'PUT',  headers, body: JSON.stringify(body) }).then(r => r.json())
-  const post = (path: string) => fetch(`${API}${path}`, { method: 'POST', headers }).then(r => r.json())
+  const get  = (path: string) => fetch(`${API}${path}`, { headers }).then(r => {
+    if (r.status === 401) { logout(); throw new Error('Sessão expirada. Faça login novamente.') }
+    return r.json()
+  })
+  const put  = (path: string, body: unknown) => fetch(`${API}${path}`, { method: 'PUT',  headers, body: JSON.stringify(body) }).then(r => {
+    if (r.status === 401) { logout(); throw new Error('Sessão expirada') }
+    return r.json()
+  })
+  const post = (path: string) => fetch(`${API}${path}`, { method: 'POST', headers }).then(r => {
+    if (r.status === 401) { logout(); throw new Error('Sessão expirada') }
+    return r.json()
+  })
   return { get, put, post }
 }
 
