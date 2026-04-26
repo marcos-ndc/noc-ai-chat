@@ -29,7 +29,7 @@ class TestAuthEndpoint:
         data = resp.json()
         assert "token" in data
         assert data["user"]["email"] == "admin@noc.local"
-        assert data["user"]["profile"] in ["N1", "N2", "engineer", "manager"]
+        assert data["user"]["profile"] in ["N1", "N2", "engineer", "manager", "admin"]
 
     def test_login_wrong_password(self, client):
         resp = client.post("/auth/login", json={

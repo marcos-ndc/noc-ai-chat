@@ -219,6 +219,7 @@ class AgentOrchestrator:
         user_message: str,
         session: SessionData,
         voice_mode: bool = False,
+        _is_handoff: bool = False,   # True = called internally after routing, prevents loop
     ) -> AsyncGenerator[WSOutbound, None]:
         """
         Yields: tool_start → tool_end → agent_token (real streaming) → agent_done
@@ -243,8 +244,10 @@ class AgentOrchestrator:
             )
             return
 
-        session.messages.append(ChatMessage(role=MessageRole.user, content=user_message))
-        await session_manager.save_session(session)
+        # Don't re-append handoff — it was already saved before the recursive call
+        if not _is_handoff:
+            session.messages.append(ChatMessage(role=MessageRole.user, content=user_message))
+            await session_manager.save_session(session)
 
         system_prompt = await get_system_prompt_async(session.user_profile, specialist=session.active_specialist, voice_mode=voice_mode)
         message_id = str(uuid.uuid4())[:8]
@@ -440,6 +443,22 @@ class AgentOrchestrator:
                         content=new_label,
                         reason=route_reason,
                     )
+
+                    # ── Auto-invoke new specialist with handoff context ────────
+                    # The new specialist must respond immediately to the handoff
+                    # so the user sees the investigation starting right away.
+                    # We yield from a new process_message call with the handoff.
+                    log.info("specialist.auto_invoke",
+                             specialist=new_spec,
+                             session_id=session.session_id)
+                    async for event in self.process_message(
+                        user_message=handoff,
+                        session=session,
+                        voice_mode=voice_mode,
+                        _is_handoff=True,   # prevent recursive routing
+                    ):
+                        yield event
+                    return  # agent_done already yielded by recursive call
             else:
                 await session_manager.save_session(session)
 

@@ -79,7 +79,7 @@ class TestSystemPrompts:
         prompt = self._get_prompt("generalista", voice=True)
         voice_idx = prompt.find("MODO VOZ") if "MODO VOZ" in prompt else prompt.find("VOZ ATIVO")
         pt_br_idx = prompt.find("Português Brasileiro")
-        assert voice_idx < pt_br_idx, "Voice addendum should come before base prompt"
+        assert pt_br_idx < voice_idx, "Language premise must be first (before voice addendum)"
 
     def test_profile_n1_has_escalation_guidance(self):
         prompt = self._get_prompt("generalista", profile="N1")
@@ -467,6 +467,64 @@ class TestOrchestratorFlow:
         assert "datadog" in captured["system"].lower(), "APM prompt should mention Datadog"
 
     @pytest.mark.asyncio
+    async def test_specialist_auto_responds_after_route_to(self):
+        """After ROUTE_TO, new specialist auto-responds with handoff context."""
+        from app.agent.orchestrator import AgentOrchestrator
+        from app.models import AIConfig, AIProvider, WSEventType, SessionData, UserProfile
+
+        self._setup_redis()
+        session = self._make_session()
+        orch    = AgentOrchestrator()
+
+        call_count = 0
+
+        async def fake_stream_fn(client, model, max_tokens, temp, system, messages, tools):
+            from types import SimpleNamespace
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # First call: generalista emits ROUTE_TO
+                yield "text", 'Identificado problema de infra. <ROUTE_TO specialist="infra" reason="CPU alta"/>'
+                final = SimpleNamespace(
+                    stop_reason="end_turn",
+                    content=[SimpleNamespace(type="text",
+                        text='Identificado problema de infra. <ROUTE_TO specialist="infra" reason="CPU alta"/>')],
+                )
+                yield "final", final
+            else:
+                # Second call: infra specialist responds to handoff
+                yield "text", "Analisando CPU alta no servidor..."
+                final = SimpleNamespace(
+                    stop_reason="end_turn",
+                    content=[SimpleNamespace(type="text", text="Analisando CPU alta no servidor...")],
+                )
+                yield "final", final
+
+        mock_cfg = AIConfig(provider=AIProvider.anthropic, model="claude-sonnet-4-20250514", api_key="sk-test")
+        mock_store = AsyncMock()
+        mock_store.get = AsyncMock(return_value=mock_cfg)
+
+        with patch("app.agent.orchestrator.ai_config_store", mock_store), \
+             patch("app.agent.orchestrator.stream_anthropic", fake_stream_fn), \
+             patch("app.agent.orchestrator.build_anthropic_client", return_value=AsyncMock()), \
+             patch("app.agent.session.session_manager.save_session", AsyncMock()):
+            events = [ev async for ev in orch.process_message("Como está o ambiente?", session)]
+
+        types = [e.type for e in events]
+
+        # Must have specialist_change
+        assert WSEventType.specialist_change in types, f"No specialist_change in {types}"
+
+        # New specialist must auto-respond (second agent_token stream)
+        agent_tokens = [e for e in events if e.type == WSEventType.agent_token]
+        assert len(agent_tokens) >= 2, "New specialist should have streamed tokens"
+
+        # Final session specialist must be infra
+        assert session.active_specialist == "infra"
+
+        # process_message was called twice (once by us, once internally for handoff)
+        assert call_count == 2, f"Expected 2 LLM calls, got {call_count}"
+
     async def test_no_api_key_yields_error(self):
         from app.agent.orchestrator import AgentOrchestrator
         from app.models import AIConfig, AIProvider, WSEventType
