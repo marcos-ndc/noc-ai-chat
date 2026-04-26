@@ -129,7 +129,7 @@ export function ChatPage() {
             const doneMsg = updated.find(m => m.id === msgId)
             if (doneMsg) {
               const plainText = stripForVoice(doneMsg.content)
-              if (plainText) voiceOutput.speak(plainText)
+              if (plainText) voiceOutput.speak(plainText, activeSpecialist)
             }
           }
           return updated

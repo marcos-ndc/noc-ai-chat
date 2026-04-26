@@ -74,12 +74,12 @@ _TEXT_MODE_INSTRUCTIONS = """
 _VOICE_MODE_INSTRUCTIONS = """
 ## Formato de Resposta (MODO VOZ — ATIVO)
 O usuário está OUVINDO esta resposta. Aplique RIGOROSAMENTE:
-- **PROIBIDO**: tabelas, gráficos, markdown, código, asteriscos, bullets, tags XML
+- **PROIBIDO**: tabelas, gráficos, markdown, código, asteriscos, bullets
 - **MÁXIMO**: 4 parágrafos curtos
 - **LINGUAGEM**: conversacional e natural, como se estivesse no telefone
 - **NÚMEROS**: pronuncie por extenso quando ambíguo (95 porcento, não 95%)
 - **JARGÃO**: evite siglas técnicas sem explicação (diga "servidor" não "host", "rede" não "BGP")
-- **ENCAMINHAMENTO**: ao rotear, diga naturalmente "Vou acionar o especialista em conectividade" — não use tags XML
+- **ENCAMINHAMENTO**: ao rotear, diga naturalmente "Vou acionar o especialista em conectividade" E inclua o tag de roteamento ao final da resposta (ele é removido automaticamente antes de ser falado ao usuário)
 """
 
 # ─── Specialist prompts ───────────────────────────────────────────────────────

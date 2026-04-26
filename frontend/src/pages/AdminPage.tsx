@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../hooks/useAuth'
 import type { AIConfigInput, AIConfigOut, AdminStatus, ModelOption, PromptEntry, TestResult } from '../types'
+import { SPECIALISTS } from '../types'
+import { saveSpecialistVoice, getSpecialistVoice } from '../hooks/useVoiceOutput'
 
 const API = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
@@ -493,6 +495,7 @@ export function AdminPage() {
   const [ttsSpeed,  setTtsSpeed]  = useState(0.92)
   const [ttsSaving, setTtsSaving] = useState(false)
   const [ttsSaveMsg, setTtsSaveMsg] = useState('')
+  const [voiceTab,  setVoiceTab]  = useState<'default' | string>('default')
 
   // Form state
   const [provider,    setProvider]    = useState<'anthropic' | 'openrouter'>('anthropic')
@@ -910,6 +913,63 @@ export function AdminPage() {
           ) : (
             <div className="space-y-6">
 
+              {/* Specialist voice tab strip */}
+              <div>
+                <label className="text-[10px] font-mono text-noc-muted mb-2 block">CONFIGURAR VOZ POR ESPECIALISTA</label>
+                <div className="flex flex-wrap gap-2">
+                  {/* Default tab */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVoiceTab('default')
+                      setTtsProvider(sessionStorage.getItem('tts_provider') || 'openai')
+                      setTtsVoice(sessionStorage.getItem('tts_voice') || 'onyx')
+                      setTtsModel(sessionStorage.getItem('tts_model') || 'tts-1-hd')
+                      setTtsSpeed(parseFloat(sessionStorage.getItem('tts_speed') || '0.92'))
+                    }}
+                    className={`px-3 py-1.5 rounded-full border text-[11px] font-mono font-bold transition-all ${
+                      voiceTab === 'default'
+                        ? 'border-noc-accent bg-noc-accent/10 text-noc-accent'
+                        : 'border-noc-border/60 bg-noc-bg/30 text-noc-muted hover:border-noc-border hover:text-noc-text'
+                    }`}
+                  >
+                    ⚙️ Padrão
+                  </button>
+                  {/* Specialist tabs */}
+                  {SPECIALISTS.map(sp => {
+                    const saved = getSpecialistVoice(sp.id)
+                    const badge = saved?.voice || null
+                    return (
+                      <button
+                        key={sp.id}
+                        type="button"
+                        onClick={() => {
+                          setVoiceTab(sp.id)
+                          if (saved) {
+                            setTtsProvider(saved.provider)
+                            setTtsVoice(saved.voice)
+                            setTtsModel(saved.model)
+                            setTtsSpeed(saved.speed)
+                          } else {
+                            setTtsProvider(sessionStorage.getItem('tts_provider') || 'openai')
+                            setTtsVoice(sessionStorage.getItem('tts_voice') || 'onyx')
+                            setTtsModel(sessionStorage.getItem('tts_model') || 'tts-1-hd')
+                            setTtsSpeed(parseFloat(sessionStorage.getItem('tts_speed') || '0.92'))
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-full border text-[11px] font-mono font-bold transition-all ${
+                          voiceTab === sp.id
+                            ? 'border-noc-accent bg-noc-accent/10 text-noc-accent'
+                            : 'border-noc-border/60 bg-noc-bg/30 text-noc-muted hover:border-noc-border hover:text-noc-text'
+                        }`}
+                      >
+                        {sp.icon} {sp.label}{badge ? <span className="ml-1 opacity-70">· {badge}</span> : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
               {/* Provider selector */}
               <div>
                 <label className="text-[10px] font-mono text-noc-muted mb-2 block">PROVEDOR DE VOZ</label>
@@ -1022,13 +1082,21 @@ export function AdminPage() {
                   onClick={async () => {
                     setTtsSaving(true)
                     setTtsSaveMsg('')
-                    // Persist to sessionStorage so useVoiceOutput picks up changes
-                    sessionStorage.setItem('tts_provider', ttsProvider)
-                    sessionStorage.setItem('tts_voice', ttsVoice)
-                    sessionStorage.setItem('tts_model', ttsModel)
-                    sessionStorage.setItem('tts_speed', String(ttsSpeed))
+                    if (voiceTab === 'default') {
+                      // Persist global fallback
+                      sessionStorage.setItem('tts_provider', ttsProvider)
+                      sessionStorage.setItem('tts_voice', ttsVoice)
+                      sessionStorage.setItem('tts_model', ttsModel)
+                      sessionStorage.setItem('tts_speed', String(ttsSpeed))
+                    } else {
+                      // Persist per-specialist
+                      saveSpecialistVoice(voiceTab, { provider: ttsProvider, voice: ttsVoice, model: ttsModel, speed: ttsSpeed })
+                    }
+                    const tabLabel = voiceTab === 'default'
+                      ? 'Padrão'
+                      : (SPECIALISTS.find(s => s.id === voiceTab)?.label ?? voiceTab)
                     setTimeout(() => {
-                      setTtsSaveMsg(`✅ Voz ${ttsVoice} (${ttsModel}) será usada nas próximas respostas desta sessão.`)
+                      setTtsSaveMsg(`✅ Voz ${ttsVoice} aplicada ao ${tabLabel}.`)
                       setTtsSaving(false)
                       setTimeout(() => setTtsSaveMsg(''), 5000)
                     }, 300)

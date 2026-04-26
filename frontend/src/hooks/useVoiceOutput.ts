@@ -11,6 +11,26 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuthStore } from './useAuth'
 import type { VoiceOutputState } from '../types'
 
+// ── Per-specialist voice helpers ─────────────────────────────────────────────
+
+export interface VoiceSettings {
+  provider: string
+  voice:    string
+  model:    string
+  speed:    number
+}
+
+export function saveSpecialistVoice(specialist: string, settings: VoiceSettings) {
+  const map = JSON.parse(sessionStorage.getItem('tts_specialist_voices') ?? '{}')
+  map[specialist] = settings
+  sessionStorage.setItem('tts_specialist_voices', JSON.stringify(map))
+}
+
+export function getSpecialistVoice(specialist: string): VoiceSettings | null {
+  const map = JSON.parse(sessionStorage.getItem('tts_specialist_voices') ?? '{}')
+  return map[specialist] ?? null
+}
+
 const API_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
 export interface TTSVoiceOption {
@@ -50,7 +70,7 @@ interface UseVoiceOutputReturn {
   isPremium:    boolean
   currentVoice: string
   ttsStatus:    TTSStatus | null
-  speak:        (text: string) => void
+  speak:        (text: string, specialist?: string) => void
   stop:         () => void
   pause:        () => void
   resume:       () => void
@@ -148,11 +168,16 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   }, [isBrowserTTSSupported])
 
   // ── OpenAI TTS (premium) ──────────────────────────────────────────────────
-  const speakPremium = useCallback(async (text: string) => {
+  const speakPremium = useCallback(async (text: string, settings?: VoiceSettings) => {
     stop()
     setState('speaking')
 
     abortRef.current = new AbortController()
+
+    const provider = settings?.provider ?? selectedProvider
+    const voice    = settings?.voice    ?? selectedVoice
+    const model    = settings?.model    ?? selectedModel
+    const speed    = settings?.speed    ?? selectedSpeed
 
     try {
       const resp = await fetch(`${API_URL}/tts/speak`, {
@@ -161,13 +186,7 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({
-          text,
-          provider: selectedProvider,
-          voice:    selectedVoice,
-          model:    selectedModel,
-          speed:    selectedSpeed,
-        }),
+        body: JSON.stringify({ text, provider, voice, model, speed }),
         signal: abortRef.current.signal,
       })
 
@@ -233,10 +252,14 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   }, [isBrowserTTSSupported, language])
 
   // ── Public speak() — picks premium or fallback ────────────────────────────
-  const speak = useCallback((text: string) => {
+  const speak = useCallback((text: string, specialist?: string) => {
     if (!text.trim()) return
+    const voicesMap: Record<string, VoiceSettings> = JSON.parse(sessionStorage.getItem('tts_specialist_voices') ?? '{}')
+    const settings: VoiceSettings | undefined = specialist && voicesMap[specialist]
+      ? voicesMap[specialist]
+      : undefined
     if (ttsStatus?.available) {
-      speakPremium(text)
+      speakPremium(text, settings)
     } else {
       speakBrowser(text)
     }
