@@ -79,7 +79,7 @@ class TestSystemPrompts:
         prompt = self._get_prompt("generalista", voice=True)
         voice_idx = prompt.find("MODO VOZ") if "MODO VOZ" in prompt else prompt.find("VOZ ATIVO")
         pt_br_idx = prompt.find("Português Brasileiro")
-        assert voice_idx < pt_br_idx, "Voice addendum should come before base prompt"
+        assert pt_br_idx < voice_idx, "Language premise must be first (before voice addendum)"
 
     def test_profile_n1_has_escalation_guidance(self):
         prompt = self._get_prompt("generalista", profile="N1")

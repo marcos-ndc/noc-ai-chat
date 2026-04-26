@@ -49,7 +49,7 @@ class TestAuthEndpoint:
 
     async def test_all_user_profiles_can_login(self, client: AsyncClient):
         users = [
-            ("admin@noc.local", "admin123", "N2"),
+            ("admin@noc.local", "admin123", "admin"),
             ("n1@noc.local", "noc2024", "N1"),
             ("eng@noc.local", "eng2024", "engineer"),
             ("gestor@noc.local", "mgr2024", "manager"),

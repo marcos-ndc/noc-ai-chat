@@ -464,8 +464,10 @@ def get_system_prompt(
     base = _SPECIALIST_PROMPTS.get(specialist, _SPECIALIST_PROMPTS[Specialist.generalista])
     base += _PROFILE_ADDENDUM.get(profile, "")
     if voice_mode:
-        return _VOICE_ADDENDUM + base
-    return _TEXT_MODE_INSTRUCTIONS + "\n" + base
+        # Voice mode: language premise first, then voice instructions, then specialist
+        return _LANGUAGE_PREMISE + _VOICE_ADDENDUM + base
+    # Text mode: language premise always first
+    return _LANGUAGE_PREMISE + _TEXT_MODE_INSTRUCTIONS + "\n" + base
 
 
 async def get_system_prompt_async(
@@ -487,8 +489,8 @@ async def get_system_prompt_async(
 
     base = spec_text + profile_text
     if voice_mode:
-        return _VOICE_ADDENDUM + base
-    return _TEXT_MODE_INSTRUCTIONS + "\n" + base
+        return _LANGUAGE_PREMISE + _VOICE_ADDENDUM + base
+    return _LANGUAGE_PREMISE + _TEXT_MODE_INSTRUCTIONS + "\n" + base
 
 
 def get_default_prompts() -> dict[str, str]:
