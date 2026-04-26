@@ -922,10 +922,10 @@ export function AdminPage() {
                     type="button"
                     onClick={() => {
                       setVoiceTab('default')
-                      setTtsProvider(sessionStorage.getItem('tts_provider') || 'openai')
-                      setTtsVoice(sessionStorage.getItem('tts_voice') || 'onyx')
-                      setTtsModel(sessionStorage.getItem('tts_model') || 'tts-1-hd')
-                      setTtsSpeed(parseFloat(sessionStorage.getItem('tts_speed') || '0.92'))
+                      setTtsProvider(localStorage\.getItem('tts_provider') || 'openai')
+                      setTtsVoice(localStorage\.getItem('tts_voice') || 'onyx')
+                      setTtsModel(localStorage\.getItem('tts_model') || 'tts-1-hd')
+                      setTtsSpeed(parseFloat(localStorage\.getItem('tts_speed') || '0.92'))
                     }}
                     className={`px-3 py-1.5 rounded-full border text-[11px] font-mono font-bold transition-all ${
                       voiceTab === 'default'
@@ -951,10 +951,10 @@ export function AdminPage() {
                             setTtsModel(saved.model)
                             setTtsSpeed(saved.speed)
                           } else {
-                            setTtsProvider(sessionStorage.getItem('tts_provider') || 'openai')
-                            setTtsVoice(sessionStorage.getItem('tts_voice') || 'onyx')
-                            setTtsModel(sessionStorage.getItem('tts_model') || 'tts-1-hd')
-                            setTtsSpeed(parseFloat(sessionStorage.getItem('tts_speed') || '0.92'))
+                            setTtsProvider(localStorage\.getItem('tts_provider') || 'openai')
+                            setTtsVoice(localStorage\.getItem('tts_voice') || 'onyx')
+                            setTtsModel(localStorage\.getItem('tts_model') || 'tts-1-hd')
+                            setTtsSpeed(parseFloat(localStorage\.getItem('tts_speed') || '0.92'))
                           }
                         }}
                         className={`px-3 py-1.5 rounded-full border text-[11px] font-mono font-bold transition-all ${
@@ -1084,10 +1084,10 @@ export function AdminPage() {
                     setTtsSaveMsg('')
                     if (voiceTab === 'default') {
                       // Persist global fallback
-                      sessionStorage.setItem('tts_provider', ttsProvider)
-                      sessionStorage.setItem('tts_voice', ttsVoice)
-                      sessionStorage.setItem('tts_model', ttsModel)
-                      sessionStorage.setItem('tts_speed', String(ttsSpeed))
+                      localStorage\.setItem('tts_provider', ttsProvider)
+                      localStorage\.setItem('tts_voice', ttsVoice)
+                      localStorage\.setItem('tts_model', ttsModel)
+                      localStorage\.setItem('tts_speed', String(ttsSpeed))
                     } else {
                       // Persist per-specialist
                       saveSpecialistVoice(voiceTab, { provider: ttsProvider, voice: ttsVoice, model: ttsModel, speed: ttsSpeed })

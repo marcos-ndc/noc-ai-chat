@@ -21,13 +21,13 @@ export interface VoiceSettings {
 }
 
 export function saveSpecialistVoice(specialist: string, settings: VoiceSettings) {
-  const map = JSON.parse(sessionStorage.getItem('tts_specialist_voices') ?? '{}')
+  const map = JSON.parse(localStorage.getItem('tts_specialist_voices') ?? '{}')
   map[specialist] = settings
-  sessionStorage.setItem('tts_specialist_voices', JSON.stringify(map))
+  localStorage.setItem('tts_specialist_voices', JSON.stringify(map))
 }
 
 export function getSpecialistVoice(specialist: string): VoiceSettings | null {
-  const map = JSON.parse(sessionStorage.getItem('tts_specialist_voices') ?? '{}')
+  const map = JSON.parse(localStorage.getItem('tts_specialist_voices') ?? '{}')
   return map[specialist] ?? null
 }
 
@@ -85,23 +85,23 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   const token = useAuthStore(s => s.token)
   const [state, setState] = useState<VoiceOutputState>('idle')
   const [ttsStatus, setTtsStatus] = useState<TTSStatus | null>(null)
-  // Persist voice settings in sessionStorage so admin panel changes apply to chat
+  // Persist voice settings in localStorage so admin panel changes apply across sessions
   const [selectedProvider, setSelectedProvider] = useState<string>(
-    () => sessionStorage.getItem('tts_provider') || 'openai'
+    () => localStorage.getItem('tts_provider') || 'openai'
   )
   const [selectedVoice, setSelectedVoiceState] = useState<string>(
-    () => sessionStorage.getItem('tts_voice') || 'onyx'
+    () => localStorage.getItem('tts_voice') || 'onyx'
   )
   const [selectedModel, setSelectedModelState] = useState<string>(
-    () => sessionStorage.getItem('tts_model') || 'tts-1-hd'
+    () => localStorage.getItem('tts_model') || 'tts-1-hd'
   )
   const [selectedSpeed, setSelectedSpeedState] = useState<number>(
-    () => parseFloat(sessionStorage.getItem('tts_speed') || '0.92')
+    () => parseFloat(localStorage.getItem('tts_speed') || '0.92')
   )
 
-  const setSelectedVoice = (v: string) => { setSelectedVoiceState(v); sessionStorage.setItem('tts_voice', v) }
-  const setSelectedModel = (m: string) => { setSelectedModelState(m); sessionStorage.setItem('tts_model', m) }
-  const setSelectedSpeed = (s: number) => { setSelectedSpeedState(s); sessionStorage.setItem('tts_speed', String(s)) }
+  const setSelectedVoice = (v: string) => { setSelectedVoiceState(v); localStorage.setItem('tts_voice', v) }
+  const setSelectedModel = (m: string) => { setSelectedModelState(m); localStorage.setItem('tts_model', m) }
+  const setSelectedSpeed = (s: number) => { setSelectedSpeedState(s); localStorage.setItem('tts_speed', String(s)) }
 
   const utteranceRef  = useRef<SpeechSynthesisUtterance | null>(null)
   const audioRef      = useRef<HTMLAudioElement | null>(null)
@@ -123,25 +123,22 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
           default_provider: rawData.default_provider || (rawData.elevenlabs?.available ? 'elevenlabs' : 'openai'),
         }
         setTtsStatus(data)
-        const defaultProv = data.default_provider
-        setSelectedProvider(defaultProv)
-        sessionStorage.setItem('tts_provider', defaultProv)
+        // Only apply server defaults when the user has no saved preferences
+        if (!localStorage.getItem('tts_provider')) {
+          const defaultProv = data.default_provider
+          setSelectedProvider(defaultProv)
+          localStorage.setItem('tts_provider', defaultProv)
 
-        if (defaultProv === 'elevenlabs' && data.elevenlabs?.available) {
-          // Use first available ElevenLabs voice if no default set
-          const voiceId = data.elevenlabs.default_voice_id
-            || Object.keys(data.elevenlabs.voices ?? {})[0]
-            || ''
-          setSelectedVoice(voiceId)
-          setSelectedModel(data.elevenlabs.default_model || 'eleven_flash_v2_5')
-          sessionStorage.setItem('tts_voice', voiceId)
-          sessionStorage.setItem('tts_model', data.elevenlabs.default_model || 'eleven_flash_v2_5')
-        } else if (data.openai?.available) {
-          const voice = data.openai.default_voice || 'onyx'
-          setSelectedVoice(voice)
-          setSelectedModel(data.openai.default_model || 'tts-1-hd')
-          sessionStorage.setItem('tts_voice', voice)
-          sessionStorage.setItem('tts_model', data.openai.default_model || 'tts-1-hd')
+          if (defaultProv === 'elevenlabs' && data.elevenlabs?.available) {
+            const voiceId = data.elevenlabs.default_voice_id
+              || Object.keys(data.elevenlabs.voices ?? {})[0]
+              || ''
+            setSelectedVoice(voiceId)
+            setSelectedModel(data.elevenlabs.default_model || 'eleven_flash_v2_5')
+          } else if (data.openai?.available) {
+            setSelectedVoice(data.openai.default_voice || 'onyx')
+            setSelectedModel(data.openai.default_model || 'tts-1-hd')
+          }
         }
       })
       .catch(() => {/* silently fallback to browser TTS */})
@@ -254,7 +251,7 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   // ── Public speak() — picks premium or fallback ────────────────────────────
   const speak = useCallback((text: string, specialist?: string) => {
     if (!text.trim()) return
-    const voicesMap: Record<string, VoiceSettings> = JSON.parse(sessionStorage.getItem('tts_specialist_voices') ?? '{}')
+    const voicesMap: Record<string, VoiceSettings> = JSON.parse(localStorage.getItem('tts_specialist_voices') ?? '{}')
     const settings: VoiceSettings | undefined = specialist && voicesMap[specialist]
       ? voicesMap[specialist]
       : undefined
@@ -295,6 +292,6 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
     setVoice:    setSelectedVoice,
     setModel:    setSelectedModel,
     setSpeed:    setSelectedSpeed,
-    setProvider: (p: string) => { setSelectedProvider(p); sessionStorage.setItem('tts_provider', p) },
+    setProvider: (p: string) => { setSelectedProvider(p); localStorage.setItem('tts_provider', p) },
   }
 }
