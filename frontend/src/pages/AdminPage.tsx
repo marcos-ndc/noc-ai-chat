@@ -517,25 +517,35 @@ export function AdminPage() {
 
   // Load data
   useEffect(() => {
+    // Fetch TTS voices independently so a failure doesn't block the rest
+    api.get('/tts/voices').then((tts: TTSStatus) => {
+      setTtsInfo(tts)
+      // Only pre-select voice/model if user has no saved preferences
+      if (!localStorage.getItem('tts_provider')) {
+        const provider = tts?.elevenlabs?.available ? 'elevenlabs' : 'openai'
+        setTtsProvider(provider)
+        if (provider === 'elevenlabs') {
+          const firstVoice = Object.keys(tts?.elevenlabs?.voices ?? {})[0] ?? ''
+          setTtsVoice(firstVoice)
+          setTtsModel(tts?.elevenlabs?.default_model ?? 'eleven_flash_v2_5')
+        } else if (tts?.openai?.available) {
+          setTtsVoice(tts?.openai?.default_voice ?? 'onyx')
+          setTtsModel(tts?.openai?.default_model ?? 'tts-1-hd')
+          setTtsSpeed(tts?.openai?.default_speed ?? 0.92)
+        }
+      } else {
+        setTtsProvider(localStorage.getItem('tts_provider') || 'openai')
+        setTtsVoice(localStorage.getItem('tts_voice') || 'onyx')
+        setTtsModel(localStorage.getItem('tts_model') || 'tts-1-hd')
+        setTtsSpeed(parseFloat(localStorage.getItem('tts_speed') || '0.92'))
+      }
+    }).catch(() => {/* TTS não disponível — seção mostrará aviso */})
+
     Promise.all([
       api.get('/admin/ai-config'),
       api.get('/admin/models'),
       api.get('/admin/status'),
-      api.get('/tts/voices'),
-    ]).then(([cfg, mdls, st, tts]) => {
-      setTtsInfo(tts)
-      // Detect active provider and pre-select voice/model
-      const provider = tts?.elevenlabs?.available ? 'elevenlabs' : 'openai'
-      setTtsProvider(provider)
-      if (provider === 'elevenlabs') {
-        const firstVoice = Object.keys(tts?.elevenlabs?.voices ?? {})[0] ?? ''
-        setTtsVoice(firstVoice)
-        setTtsModel(tts?.elevenlabs?.default_model ?? 'eleven_flash_v2_5')
-      } else if (tts?.openai?.available) {
-        setTtsVoice(tts?.openai?.default_voice ?? 'onyx')
-        setTtsModel(tts?.openai?.default_model ?? 'tts-1-hd')
-        setTtsSpeed(tts?.openai?.default_speed ?? 0.92)
-      }
+    ]).then(([cfg, mdls, st]) => {
       setConfig(cfg)
       setModels(mdls)
       setStatus(st)
@@ -922,10 +932,10 @@ export function AdminPage() {
                     type="button"
                     onClick={() => {
                       setVoiceTab('default')
-                      setTtsProvider(localStorage\.getItem('tts_provider') || 'openai')
-                      setTtsVoice(localStorage\.getItem('tts_voice') || 'onyx')
-                      setTtsModel(localStorage\.getItem('tts_model') || 'tts-1-hd')
-                      setTtsSpeed(parseFloat(localStorage\.getItem('tts_speed') || '0.92'))
+                      setTtsProvider(localStorage.getItem('tts_provider') || 'openai')
+                      setTtsVoice(localStorage.getItem('tts_voice') || 'onyx')
+                      setTtsModel(localStorage.getItem('tts_model') || 'tts-1-hd')
+                      setTtsSpeed(parseFloat(localStorage.getItem('tts_speed') || '0.92'))
                     }}
                     className={`px-3 py-1.5 rounded-full border text-[11px] font-mono font-bold transition-all ${
                       voiceTab === 'default'
@@ -951,10 +961,10 @@ export function AdminPage() {
                             setTtsModel(saved.model)
                             setTtsSpeed(saved.speed)
                           } else {
-                            setTtsProvider(localStorage\.getItem('tts_provider') || 'openai')
-                            setTtsVoice(localStorage\.getItem('tts_voice') || 'onyx')
-                            setTtsModel(localStorage\.getItem('tts_model') || 'tts-1-hd')
-                            setTtsSpeed(parseFloat(localStorage\.getItem('tts_speed') || '0.92'))
+                            setTtsProvider(localStorage.getItem('tts_provider') || 'openai')
+                            setTtsVoice(localStorage.getItem('tts_voice') || 'onyx')
+                            setTtsModel(localStorage.getItem('tts_model') || 'tts-1-hd')
+                            setTtsSpeed(parseFloat(localStorage.getItem('tts_speed') || '0.92'))
                           }
                         }}
                         className={`px-3 py-1.5 rounded-full border text-[11px] font-mono font-bold transition-all ${
@@ -1084,10 +1094,10 @@ export function AdminPage() {
                     setTtsSaveMsg('')
                     if (voiceTab === 'default') {
                       // Persist global fallback
-                      localStorage\.setItem('tts_provider', ttsProvider)
-                      localStorage\.setItem('tts_voice', ttsVoice)
-                      localStorage\.setItem('tts_model', ttsModel)
-                      localStorage\.setItem('tts_speed', String(ttsSpeed))
+                      localStorage.setItem('tts_provider', ttsProvider)
+                      localStorage.setItem('tts_voice', ttsVoice)
+                      localStorage.setItem('tts_model', ttsModel)
+                      localStorage.setItem('tts_speed', String(ttsSpeed))
                     } else {
                       // Persist per-specialist
                       saveSpecialistVoice(voiceTab, { provider: ttsProvider, voice: ttsVoice, model: ttsModel, speed: ttsSpeed })

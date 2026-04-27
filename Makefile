@@ -44,7 +44,8 @@ dev-bg: ## Sobe stack em background
 
 # ─── Produção ─────────────────────────────────────────────────────────────────
 prod: ## Sobe stack de produção
-	docker compose up --build -d
+	docker compose -f docker-compose.yml down --remove-orphans 2>/dev/null || true
+	docker compose -f docker-compose.yml up --build --force-recreate -d
 	@echo "$(GREEN)✅ Stack de produção rodando$(RESET)"
 
 # ─── Testes ───────────────────────────────────────────────────────────────────

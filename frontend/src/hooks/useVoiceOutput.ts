@@ -103,6 +103,20 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
   const setSelectedModel = (m: string) => { setSelectedModelState(m); localStorage.setItem('tts_model', m) }
   const setSelectedSpeed = (s: number) => { setSelectedSpeedState(s); localStorage.setItem('tts_speed', String(s)) }
 
+  // Refs to avoid stale closures in useCallback — always reflect latest values
+  const tokenRef    = useRef(token)
+  const providerRef = useRef(selectedProvider)
+  const voiceRef    = useRef(selectedVoice)
+  const modelRef    = useRef(selectedModel)
+  const speedRef    = useRef(selectedSpeed)
+  const statusRef   = useRef(ttsStatus)
+  useEffect(() => { tokenRef.current    = token },           [token])
+  useEffect(() => { providerRef.current = selectedProvider }, [selectedProvider])
+  useEffect(() => { voiceRef.current    = selectedVoice },   [selectedVoice])
+  useEffect(() => { modelRef.current    = selectedModel },   [selectedModel])
+  useEffect(() => { speedRef.current    = selectedSpeed },   [selectedSpeed])
+  useEffect(() => { statusRef.current   = ttsStatus },       [ttsStatus])
+
   const utteranceRef  = useRef<SpeechSynthesisUtterance | null>(null)
   const audioRef      = useRef<HTMLAudioElement | null>(null)
   const abortRef      = useRef<AbortController | null>(null)
@@ -171,17 +185,19 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
 
     abortRef.current = new AbortController()
 
-    const provider = settings?.provider ?? selectedProvider
-    const voice    = settings?.voice    ?? selectedVoice
-    const model    = settings?.model    ?? selectedModel
-    const speed    = settings?.speed    ?? selectedSpeed
+    // Use refs to always get the latest values — avoids stale closure bug
+    const provider = settings?.provider ?? providerRef.current
+    const voice    = settings?.voice    ?? voiceRef.current
+    const model    = settings?.model    ?? modelRef.current
+    const speed    = settings?.speed    ?? speedRef.current
+    const tok      = tokenRef.current
 
     try {
       const resp = await fetch(`${API_URL}/tts/speak`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
         },
         body: JSON.stringify({ text, provider, voice, model, speed }),
         signal: abortRef.current.signal,
@@ -255,12 +271,12 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
     const settings: VoiceSettings | undefined = specialist && voicesMap[specialist]
       ? voicesMap[specialist]
       : undefined
-    if (ttsStatus?.available) {
+    if (statusRef.current?.available) {
       speakPremium(text, settings)
     } else {
       speakBrowser(text)
     }
-  }, [ttsStatus?.available, speakPremium, speakBrowser])
+  }, [speakPremium, speakBrowser])
 
   const pause = useCallback(() => {
     if (audioRef.current) {
