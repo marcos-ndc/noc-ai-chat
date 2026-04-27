@@ -126,7 +126,8 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
 
   // ── Check OpenAI TTS availability on mount ────────────────────────────────
   useEffect(() => {
-    const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+    const currentToken = useAuthStore.getState().token
+    const authHeaders: Record<string, string> = currentToken ? { Authorization: `Bearer ${currentToken}` } : {}
     fetch(`${API_URL}/tts/voices`, { headers: authHeaders })
       .then(r => r.json())
       .then((rawData: any) => {
@@ -185,12 +186,12 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
 
     abortRef.current = new AbortController()
 
-    // Use refs to always get the latest values — avoids stale closure bug
+    // Read fresh values — useAuthStore.getState() is always current (no race condition)
     const provider = settings?.provider ?? providerRef.current
     const voice    = settings?.voice    ?? voiceRef.current
     const model    = settings?.model    ?? modelRef.current
     const speed    = settings?.speed    ?? speedRef.current
-    const tok      = tokenRef.current
+    const tok      = useAuthStore.getState().token
 
     try {
       const resp = await fetch(`${API_URL}/tts/speak`, {
@@ -204,8 +205,7 @@ export function useVoiceOutput(language = 'pt-BR'): UseVoiceOutputReturn {
       })
 
       if (!resp.ok) {
-        // Server returned error — fallback to browser TTS
-        console.warn('OpenAI TTS failed, falling back to browser TTS')
+        console.warn(`TTS request failed (${resp.status}), falling back to browser TTS`)
         speakBrowser(text)
         return
       }
