@@ -106,11 +106,12 @@ async def speak(req: TTSRequest, _: UserOut = Depends(get_current_user)):
         try:
             return await _speak_elevenlabs(text, req.voice, req.model, c)
         except HTTPException as e:
-            # Fallback to OpenAI if ElevenLabs fails (proxy block, network issue, etc.)
+            # Fallback to OpenAI if ElevenLabs fails (quota exceeded, network issue, etc.)
             import logging
             logging.warning(f"ElevenLabs failed ({e.detail}), falling back to OpenAI")
             if not c["openai_key"]:
-                raise
+                raise HTTPException(status_code=503,
+                                    detail="TTS indisponível: cota ElevenLabs esgotada e OPENAI_API_KEY não configurada")
             return await _speak_openai(text, req.voice, req.speed, req.model, c)
     else:
         return await _speak_openai(text, req.voice, req.speed, req.model, c)
@@ -160,7 +161,9 @@ async def _speak_elevenlabs(text: str, voice_id: str, model: str, c: dict | None
         )
         if resp.status_code != 200:
             detail = resp.text[:300] if resp.text else f"HTTP {resp.status_code}"
-            raise HTTPException(status_code=resp.status_code,
+            # Always return 503 for ElevenLabs errors — ElevenLabs uses 401 for quota
+            # exceeded which would confuse the client into thinking it's an auth error.
+            raise HTTPException(status_code=503,
                                 detail=f"ElevenLabs error: {detail}")
         return Response(content=resp.content, media_type="audio/mpeg",
                         headers={"X-TTS-Provider": "elevenlabs", "X-TTS-Voice": vid})
