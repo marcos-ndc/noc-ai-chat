@@ -22,7 +22,7 @@ async def health():
         services.append(ServiceStatus(name="redis", status="down"))
 
     # MCP servers
-    for svc in ["zabbix", "datadog", "grafana", "thousandeyes"]:
+    for svc in ["zabbix", "datadog", "grafana", "thousandeyes", "catalyst"]:
         result = await _dispatcher.health_check(svc)
         services.append(ServiceStatus(name=f"mcp-{svc}", status=result["status"]))
 

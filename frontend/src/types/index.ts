@@ -24,7 +24,7 @@ export interface Message {
 
 // ─── NOC Tools ───────────────────────────────────────────────────────────────
 
-export type ToolName = 'zabbix' | 'datadog' | 'grafana' | 'thousandeyes'
+export type ToolName = 'zabbix' | 'datadog' | 'grafana' | 'thousandeyes' | 'catalyst'
 
 export interface ToolStatus {
   tool: ToolName
@@ -34,10 +34,11 @@ export interface ToolStatus {
 }
 
 export const TOOL_METADATA: Record<ToolName, { label: string; icon: string; color: string }> = {
-  zabbix:       { label: 'Zabbix',       icon: '🔴', color: '#d40000' },
-  datadog:      { label: 'Datadog',      icon: '🐕', color: '#632ca6' },
-  grafana:      { label: 'Grafana',      icon: '📊', color: '#f46800' },
-  thousandeyes: { label: 'ThousandEyes', icon: '👁️', color: '#00bceb' },
+  zabbix:       { label: 'Zabbix',           icon: '🔴', color: '#d40000' },
+  datadog:      { label: 'Datadog',          icon: '🐕', color: '#632ca6' },
+  grafana:      { label: 'Grafana',          icon: '📊', color: '#f46800' },
+  thousandeyes: { label: 'ThousandEyes',     icon: '👁️', color: '#00bceb' },
+  catalyst:     { label: 'Catalyst Center',  icon: '🌐', color: '#00bcff' },
 }
 
 // ─── WebSocket Events ─────────────────────────────────────────────────────────

@@ -124,11 +124,54 @@ MCP_TOOLS: list[dict] = [
     {"name": "thousandeyes_get_agents",
      "description": "Lista agentes ThousandEyes disponíveis (enterprise e cloud) com localização e status.",
      "input_schema": {"type": "object", "properties": {}}},
+    # Cisco Catalyst Center
+    {"name": "catalyst_fetch_devices",
+     "description": "Lista dispositivos de rede gerenciados pelo Cisco Catalyst Center (switches, roteadores, APs, WLCs). Filtre por hostname, família de equipamento ou status de acessibilidade. Use para inventário de rede ou triagem de dispositivos com problema.",
+     "input_schema": {"type": "object", "properties": {
+         "hostname":            {"type": "string", "description": "Filtro parcial por hostname"},
+         "family":              {"type": "string", "description": "Família: 'Switches and Hubs', 'Routers', 'Wireless Controller'"},
+         "management_ip":       {"type": "string", "description": "IP de gerenciamento exato"},
+         "reachability_status": {"type": "string", "enum": ["Reachable", "Unreachable"]},
+         "limit":               {"type": "integer", "default": 50}}}},
+    {"name": "catalyst_fetch_sites",
+     "description": "Lista a hierarquia de sites do Catalyst Center (Global > Área > Building > Andar). Útil para entender a topologia lógica e localização dos dispositivos.",
+     "input_schema": {"type": "object", "properties": {
+         "name": {"type": "string", "description": "Filtro por nome do site"}}}},
+    {"name": "catalyst_fetch_interfaces",
+     "description": "Busca interfaces de um dispositivo de rede no Catalyst Center. Retorna status operacional, velocidade, VLAN, IP e descrição. Útil para diagnosticar problemas de conectividade em portas específicas.",
+     "input_schema": {"type": "object", "properties": {
+         "device_id": {"type": "string", "description": "ID interno do dispositivo no Catalyst Center"},
+         "hostname":  {"type": "string", "description": "Hostname do dispositivo (resolvido automaticamente para ID)"}}}},
+    {"name": "catalyst_get_clients_list",
+     "description": "Lista clientes conectados à rede (PCs, celulares, IoT, VoIP). Filtre por tipo (wired/wireless) ou status. Útil para troubleshooting de acesso e análise de usuários conectados.",
+     "input_schema": {"type": "object", "properties": {
+         "limit":              {"type": "integer", "default": 50},
+         "connection_status":  {"type": "string", "enum": ["CONNECTED", "DISCONNECTED"]},
+         "host_type":          {"type": "string", "enum": ["WIRELESS", "WIRED"]},
+         "start_time":         {"type": "integer", "description": "Epoch ms início (padrão: 5 min atrás)"},
+         "end_time":           {"type": "integer", "description": "Epoch ms fim (padrão: agora)"}}}},
+    {"name": "catalyst_get_client_by_mac",
+     "description": "Busca detalhes completos de um dispositivo cliente pelo MAC address. Retorna localização na rede, SSID, health score, RSSI, SNR e switch/AP conectado.",
+     "input_schema": {"type": "object", "properties": {
+         "mac_address": {"type": "string", "description": "MAC address no formato xx:xx:xx:xx:xx:xx"}},
+         "required": ["mac_address"]}},
+    {"name": "catalyst_get_clients_count",
+     "description": "Retorna o total de clientes conectados à rede no período especificado.",
+     "input_schema": {"type": "object", "properties": {
+         "start_time": {"type": "integer", "description": "Epoch ms início"},
+         "end_time":   {"type": "integer", "description": "Epoch ms fim"}}}},
+    {"name": "catalyst_get_network_health",
+     "description": "Retorna o score de saúde geral da rede por categoria (Switches, Roteadores, Wireless, APs). Identifica categorias com dispositivos em estado ruim ou regular. Use como primeiro passo em triagem de incidentes de rede.",
+     "input_schema": {"type": "object", "properties": {
+         "epoch_time": {"type": "integer", "description": "Epoch ms para snapshot de saúde (padrão: agora)"}}}},
 ]
 
 _TOOL_PREFIX_MAP: dict[str, ToolName] = {
-    "zabbix": ToolName.zabbix, "datadog": ToolName.datadog,
-    "grafana": ToolName.grafana, "thousandeyes": ToolName.thousandeyes,
+    "zabbix":       ToolName.zabbix,
+    "datadog":      ToolName.datadog,
+    "grafana":      ToolName.grafana,
+    "thousandeyes": ToolName.thousandeyes,
+    "catalyst":     ToolName.catalyst,
 }
 
 

@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     mcp_datadog_url: str = "http://mcp-datadog:8001"
     mcp_grafana_url: str = "http://mcp-grafana:8001"
     mcp_thousandeyes_url: str = "http://mcp-thousandeyes:8001"
+    mcp_catalyst_center_url: str = "http://mcp-catalyst-center:8001"
 
     # App
     log_level: str = "INFO"

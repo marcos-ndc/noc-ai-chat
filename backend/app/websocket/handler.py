@@ -35,7 +35,10 @@ class ConnectionManager:
     async def send(self, session_id: str, event: WSOutbound) -> None:
         ws = self._connections.get(session_id)
         if ws:
-            await ws.send_text(event.to_json())
+            try:
+                await ws.send_text(event.to_json())
+            except (WebSocketDisconnect, RuntimeError):
+                pass  # Client already disconnected — nothing to do
 
     @property
     def active_count(self) -> int:
@@ -154,6 +157,11 @@ async def handle_chat_websocket(ws: WebSocket) -> None:
                 ):
                     await manager.send(connection_id, event)
 
+            except WebSocketDisconnect:
+                # Client closed the connection during processing — clean exit, no error to send
+                log.info("ws.client_disconnected_during_processing", session_id=session_id)
+                return
+
             except Exception as e:
                 import traceback
                 error_type = type(e).__name__
@@ -204,6 +212,13 @@ async def handle_chat_websocket(ws: WebSocket) -> None:
 
     except WebSocketDisconnect:
         log.info("ws.client_disconnected", connection_id=connection_id)
+    except RuntimeError as e:
+        # Starlette raises RuntimeError("WebSocket is not connected...") when the
+        # client closes the connection exactly as the server sends the final event.
+        if "WebSocket" in str(e):
+            log.info("ws.client_disconnected_runtime", connection_id=connection_id)
+        else:
+            log.error("ws.unexpected_error", error=str(e), connection_id=connection_id)
     except Exception as e:
         log.error("ws.unexpected_error", error=str(e), connection_id=connection_id)
     finally:

@@ -9,6 +9,7 @@ _MCP_URLS: dict[str, str] = {
     "datadog":      settings.mcp_datadog_url,
     "grafana":      settings.mcp_grafana_url,
     "thousandeyes": settings.mcp_thousandeyes_url,
+    "catalyst":     settings.mcp_catalyst_center_url,
 }
 
 

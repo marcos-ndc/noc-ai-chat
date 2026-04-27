@@ -46,10 +46,11 @@ class WSEventType(str, Enum):
     pong         = "pong"
 
 class ToolName(str, Enum):
-    zabbix       = "zabbix"
-    datadog      = "datadog"
-    grafana      = "grafana"
-    thousandeyes = "thousandeyes"
+    zabbix          = "zabbix"
+    datadog         = "datadog"
+    grafana         = "grafana"
+    thousandeyes    = "thousandeyes"
+    catalyst        = "catalyst"
 
 
 # ─── Auth ────────────────────────────────────────────────────────────────────
